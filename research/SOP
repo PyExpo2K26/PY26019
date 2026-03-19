@@ -1,0 +1,13 @@
+Statement of Purpose
+
+Floods are among the most destructive natural disasters, often causing severe damage to both human life and infrastructure. Growing urbanization and unpredictable climate patterns have made flood prediction more challenging than ever. This concern inspired me to work on a project titled “Flood Prediction and Alert System”, where I aimed to develop a reliable and real-time solution to predict floods and provide early warnings.
+
+The main objective of this project was to design a system that can analyze environmental data and predict flood risks accurately. To achieve this, I worked on integrating hydrological modeling techniques with modern technologies such as machine learning, web development frameworks, and real-time data processing systems. This project allowed me to explore both theoretical concepts and practical implementation in depth.
+
+A key part of my work involved developing a hydrological model using the Rational Method to estimate flood discharge based on rainfall intensity, runoff coefficient, and catchment area. Alongside this, I incorporated regression techniques to enhance prediction capability. I also handled data preprocessing, where I cleaned and prepared historical rainfall and river-level datasets to ensure accurate model performance.
+
+On the technical side, I contributed to building the backend using Flask, which manages the core processing and prediction logic. I also worked with Streamlit to design a user-friendly interface that displays flood risk levels in an intuitive manner. One of the most impactful features we implemented was the automated alert system, which sends notifications to users when flood risk exceeds a critical threshold. Additionally, we introduced a safe route suggestion feature, helping people navigate to safer areas during emergencies.
+
+Through this project, I gained hands-on experience in data analysis, model development, and full-stack application design. More importantly, I understood the importance of developing solutions that have real-world impact. This experience strengthened my problem-solving skills, teamwork, and ability to apply technical knowledge to address societal challenges.
+
+Overall, this project reflects my interest in combining technology with environmental applications to create meaningful solutions. I am motivated to further explore this field and contribute to innovative systems that enhance disaster preparedness and public safety.
