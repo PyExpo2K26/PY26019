@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: floodwatch-india
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 4 --bind 0.0.0.0:$PORT --timeout 120
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: GMAIL_ADDRESS
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: OWM_API_KEY
+        sync: false
+    disk:
+      name: floodwatch-data
+      mountPath: /data
+      sizeGB: 1
