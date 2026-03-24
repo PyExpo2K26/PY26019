@@ -3,616 +3,227 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flood Prediction System — India</title>
+    <title>FloodWatch India — AI Flood Prediction</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --blue:    #1a56db;
-            --blue-dk: #0f3a99;
-            --cyan:    #06b6d4;
-            --red:     #ef4444;
-            --amber:   #f59e0b;
-            --green:   #22c55e;
-            --dark:    #0b0f1a;
-            --panel:   rgba(255,255,255,0.82);
-            --border:  rgba(6,182,212,0.22);
-            --text:    #1e3a5f;
-            --muted:   #4a7fa5;
+            --blue:#1a56db; --blue-dk:#0f3a99; --cyan:#06b6d4;
+            --danger:#ef4444; --warn:#f59e0b; --safe:#22c55e;
+            --panel:rgba(255,255,255,0.85); --border:rgba(6,182,212,0.22);
+            --text:#1e3a5f; --muted:#4a7fa5;
         }
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:'DM Sans',sans-serif;background:#c8eeff;color:var(--text);min-height:100vh;overflow-x:hidden;}
+        #water-bg{position:fixed;inset:0;z-index:0;width:100%;height:100%;}
+        .sun-shimmer{position:fixed;inset:0;z-index:1;background:linear-gradient(180deg,rgba(255,248,220,.18) 0%,rgba(200,238,255,.08) 35%,rgba(100,200,240,.12) 70%,rgba(30,140,200,.22) 100%);pointer-events:none;}
 
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        /* NAV */
+        .nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:64px;background:rgba(255,255,255,.82);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);box-shadow:0 2px 20px rgba(30,140,200,.1);}
+        .nav-brand{display:flex;align-items:center;gap:10px;font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:#0c3b6e;text-decoration:none;}
+        .nav-brand .drop{width:32px;height:32px;background:linear-gradient(135deg,var(--blue),var(--cyan));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+        .live-badge{display:flex;align-items:center;gap:6px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);color:#16a34a;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:500;}
+        .live-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:#16a34a;animation:pulse-dot 1.5s infinite;}
+        @keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
+        .nav-links{display:flex;gap:4px;align-items:center;}
+        .nav-links a{color:#2c6e9e;text-decoration:none;padding:7px 16px;border-radius:8px;font-size:14px;font-weight:500;transition:all .2s;}
+        .nav-links a:hover{color:#0c3b6e;background:rgba(6,182,212,.1);}
+        .nav-links a.btn-login-nav{background:linear-gradient(135deg,var(--blue),#2563eb);color:white;padding:7px 18px;font-weight:600;font-size:13px;box-shadow:0 2px 10px rgba(26,86,219,.3);}
+        .nav-links a.btn-login-nav:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(26,86,219,.45);}
 
-        body {
-            font-family: 'DM Sans', sans-serif;
-            background: #c8eeff;
-            color: var(--text);
-            min-height: 100vh;
-            overflow-x: hidden;
+        /* HAMBURGER */
+        .hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:8px;border:none;background:none;}
+        .hamburger span{width:22px;height:2px;background:#0c3b6e;border-radius:2px;transition:all .3s;}
+        .hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+        .hamburger.open span:nth-child(2){opacity:0}
+        .hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+        .mobile-menu{display:none;position:fixed;top:64px;left:0;right:0;z-index:99;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:12px 16px;flex-direction:column;gap:4px;box-shadow:0 8px 24px rgba(30,140,200,.1);}
+        .mobile-menu.open{display:flex;}
+        .mobile-menu a{color:#2c6e9e;text-decoration:none;font-size:14px;font-weight:600;padding:11px 14px;border-radius:10px;border:1px solid transparent;transition:all .2s;}
+        .mobile-menu a:hover{background:rgba(6,182,212,.09);color:#0c3b6e;}
+        .mobile-menu a.btn-login-mobile{background:linear-gradient(135deg,var(--blue),#2563eb);color:white;text-align:center;}
+
+        /* HERO */
+        .hero{position:relative;z-index:2;height:calc(100vh - 64px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24px;}
+        .hero-eyebrow{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.72);border:1px solid rgba(6,182,212,.35);color:#1a56db;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:500;letter-spacing:.5px;text-transform:uppercase;margin-bottom:28px;backdrop-filter:blur(8px);}
+        .hero h1{font-family:'Syne',sans-serif;font-size:clamp(3rem,8vw,6.5rem);font-weight:800;line-height:1.05;color:#0a2f5a;letter-spacing:-1px;text-shadow:0 2px 20px rgba(255,255,255,.8);}
+        .hero h1 span{background:linear-gradient(90deg,#0369a1,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+        .hero p{font-size:17px;color:#2c6e9e;line-height:1.7;max-width:560px;margin:20px auto 40px;text-shadow:0 1px 8px rgba(255,255,255,.7);}
+        .scroll-hint{position:absolute;bottom:32px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;animation:bounce 2s infinite;}
+        .scroll-hint svg{width:22px;height:22px;opacity:.5;}
+        @keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0);opacity:.7}50%{transform:translateX(-50%) translateY(8px);opacity:1}}
+
+        /* MAIN CARD */
+        .main-card{position:relative;z-index:2;max-width:860px;margin:0 auto;padding:0 20px 80px;}
+        .card-inner{background:rgba(255,255,255,.86);border:1px solid var(--border);border-radius:20px;overflow:hidden;backdrop-filter:blur(20px);box-shadow:0 8px 40px rgba(30,140,200,.15),0 2px 8px rgba(0,0,0,.05);}
+        .tabs{display:flex;border-bottom:1px solid rgba(6,182,212,.18);background:rgba(200,238,255,.35);}
+        .tab-btn{flex:1;padding:18px 16px;background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:8px;border-bottom:2px solid transparent;transition:all .2s;margin-bottom:-1px;}
+        .tab-btn:hover{color:#0c3b6e;}
+        .tab-btn.active{color:#0369a1;border-bottom-color:#06b6d4;background:rgba(255,255,255,.6);}
+        .tab-icon{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;}
+        .tab-btn.active .tab-icon{background:rgba(6,182,212,.14);}
+        .tab-panel{display:none;padding:28px;}
+        .tab-panel.active{display:block;}
+        .panel-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;color:#0c3b6e;margin-bottom:6px;}
+        .panel-sub{font-size:14px;color:var(--muted);margin-bottom:24px;line-height:1.5;}
+
+        /* SELECTS / INPUTS */
+        .select-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+        .field-wrap{display:flex;flex-direction:column;gap:8px;}
+        .field-label{font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+        .select-arrow{position:relative;}
+        .select-arrow::after{content:'▾';position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;font-size:13px;}
+        select,input[type="number"]{width:100%;background:rgba(255,255,255,.85);border:1px solid rgba(6,182,212,.28);border-radius:10px;color:#0c3b6e;padding:13px 16px;font-family:'DM Sans',sans-serif;font-size:15px;outline:none;appearance:none;-webkit-appearance:none;transition:border-color .2s,box-shadow .2s;}
+        select:focus,input[type="number"]:focus{border-color:#06b6d4;box-shadow:0 0 0 3px rgba(6,182,212,.14);}
+        select option{background:white;color:#0c3b6e;}
+        input[type="number"]::placeholder{color:var(--muted);}
+        input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;}
+        .manual-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;}
+
+        /* PREDICT BUTTON */
+        .predict-btn{width:100%;padding:16px;background:linear-gradient(135deg,var(--blue),var(--blue-dk));border:none;border-radius:12px;color:white;font-family:'Syne',sans-serif;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:transform .2s,box-shadow .2s,opacity .2s;box-shadow:0 4px 20px rgba(26,86,219,.35);display:flex;align-items:center;justify-content:center;gap:10px;text-decoration:none;}
+        .predict-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(26,86,219,.48);}
+        .predict-btn:active{transform:translateY(0);}
+        .predict-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+        .btn-arrow{font-size:18px;transition:transform .2s;}
+        .predict-btn:hover .btn-arrow{transform:translateX(4px);}
+
+        /* RESULT PANEL */
+        #result-panel{display:none;margin-top:22px;border:1px solid rgba(6,182,212,.22);border-radius:14px;overflow:hidden;animation:fadeUp .4s ease;background:rgba(255,255,255,.75);}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+        .result-header{padding:18px 22px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+        .result-header.high    {background:rgba(239,68,68,.09);border-bottom:1px solid rgba(239,68,68,.18);}
+        .result-header.moderate{background:rgba(245,158,11,.09);border-bottom:1px solid rgba(245,158,11,.18);}
+        .result-header.low     {background:rgba(34,197,94,.09); border-bottom:1px solid rgba(34,197,94,.18);}
+        .result-risk-label{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;}
+        .result-risk-label.high    {color:#dc2626;}
+        .result-risk-label.moderate{color:#d97706;}
+        .result-risk-label.low     {color:#16a34a;}
+        .result-location{font-size:13px;color:var(--muted);margin-top:2px;}
+        .prob-pill{padding:6px 16px;border-radius:20px;font-size:14px;font-weight:700;}
+        .prob-pill.high    {background:rgba(239,68,68,.12);color:#dc2626;}
+        .prob-pill.moderate{background:rgba(245,158,11,.12);color:#d97706;}
+        .prob-pill.low     {background:rgba(34,197,94,.12); color:#16a34a;}
+        .result-body{padding:18px 22px;}
+        .result-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px;}
+        .metric-box{background:rgba(200,238,255,.35);border:1px solid rgba(6,182,212,.18);border-radius:10px;padding:14px;text-align:center;}
+        .metric-val{font-size:1.4rem;font-weight:700;color:#0c3b6e;margin-bottom:3px;}
+        .metric-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+        .prob-bar-row{margin-bottom:16px;}
+        .prob-bar-label{font-size:12px;color:var(--muted);margin-bottom:7px;display:flex;justify-content:space-between;}
+        .prob-track{background:rgba(6,182,212,.1);border-radius:6px;height:8px;overflow:hidden;}
+        .prob-fill{height:100%;border-radius:6px;transition:width 1s ease;}
+        .prob-fill.high    {background:linear-gradient(90deg,#f87171,#ef4444);}
+        .prob-fill.moderate{background:linear-gradient(90deg,#fbbf24,#f59e0b);}
+        .prob-fill.low     {background:linear-gradient(90deg,#4ade80,#22c55e);}
+        .result-actions{display:flex;gap:10px;}
+        .action-btn{flex:1;padding:11px;border-radius:10px;border:1px solid rgba(6,182,212,.25);background:rgba(255,255,255,.75);color:#0c3b6e;font-size:13px;font-weight:500;cursor:pointer;text-align:center;text-decoration:none;transition:all .2s;font-family:'DM Sans',sans-serif;display:block;}
+        .action-btn:hover{background:rgba(6,182,212,.1);color:#0369a1;}
+        .action-btn.primary{background:#0369a1;border-color:#0369a1;color:white;}
+        .action-btn.primary:hover{background:#0c3b6e;}
+
+        /* LOGIN NOTICE */
+        .login-notice{background:rgba(26,86,219,.07);border:1px solid rgba(26,86,219,.2);border-radius:10px;padding:14px 18px;font-size:13px;color:#1a56db;text-align:center;margin-top:12px;line-height:1.6;}
+        .login-notice a{color:#0c3b6e;font-weight:700;text-decoration:underline;}
+
+        /* LIVE */
+        #live-alert{padding:14px 18px;border-radius:10px;text-align:center;font-weight:600;font-size:15px;background:rgba(255,255,255,.05);color:var(--muted);margin-bottom:20px;}
+
+        /* LOADING */
+        #loading-overlay{display:none;position:fixed;inset:0;z-index:999;background:rgba(200,238,255,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;flex-direction:column;gap:16px;}
+        #loading-overlay.show{display:flex;}
+        .loading-ring{width:50px;height:50px;border:3px solid rgba(6,182,212,.2);border-top-color:#0369a1;border-radius:50%;animation:spin .8s linear infinite;}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .loading-text{font-size:15px;color:#0c3b6e;font-weight:600;}
+        #alert-banner{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:200;min-width:300px;max-width:480px;padding:14px 20px;border-radius:12px;font-size:14px;font-weight:500;animation:slideUp .3s ease;}
+        #alert-banner.error{background:rgba(239,68,68,.94);color:white;border:1px solid #ef4444;}
+        #alert-banner.info {background:rgba(3,105,161,.94);color:white;border:1px solid #0369a1;}
+        @keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+        /* STATS & FEATURES */
+        .stats-strip{position:relative;z-index:2;max-width:860px;margin:0 auto;padding:0 20px 32px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+        .strip-card{background:rgba(255,255,255,.78);border:1px solid var(--border);border-radius:14px;padding:18px 16px;text-align:center;backdrop-filter:blur(12px);box-shadow:0 2px 12px rgba(30,140,200,.08);transition:transform .2s,border-color .2s;}
+        .strip-card:hover{transform:translateY(-3px);border-color:rgba(6,182,212,.4);}
+        .strip-val{font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:#0c3b6e;margin-bottom:4px;}
+        .strip-lbl{font-size:12px;color:var(--muted);}
+        .features{position:relative;z-index:2;max-width:860px;margin:0 auto;padding:0 20px 80px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+        .feat-card{background:rgba(255,255,255,.78);border:1px solid rgba(6,182,212,.18);border-radius:14px;padding:22px 20px;backdrop-filter:blur(12px);transition:border-color .2s,transform .2s,box-shadow .2s;}
+        .feat-card:hover{border-color:rgba(6,182,212,.45);transform:translateY(-3px);box-shadow:0 8px 24px rgba(30,140,200,.12);}
+        .feat-icon{width:40px;height:40px;border-radius:10px;background:rgba(6,182,212,.12);display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:14px;}
+        .feat-title{font-size:14px;font-weight:700;color:#0c3b6e;margin-bottom:6px;}
+        .feat-desc {font-size:13px;color:var(--muted);line-height:1.6;}
+
+        /* RESPONSIVE */
+        @media(max-width:768px){
+            .nav-links{display:none;}
+            .hamburger{display:flex;}
+            .stats-strip{grid-template-columns:1fr 1fr;}
+            .features{grid-template-columns:1fr 1fr;}
         }
-
-        /* ── WATER CANVAS BACKGROUND ── */
-        #water-bg {
-            position: fixed; inset: 0; z-index: 0;
-            width: 100%; height: 100%;
-        }
-
-        /* ── SUNLIGHT SHIMMER OVERLAY ── */
-        .sun-shimmer {
-            position: fixed; inset: 0; z-index: 1;
-            background: linear-gradient(
-                180deg,
-                rgba(255,248,220,0.18) 0%,
-                rgba(200,238,255,0.08) 35%,
-                rgba(100,200,240,0.12) 70%,
-                rgba(30,140,200,0.22)  100%
-            );
-            pointer-events: none;
-        }
-
-        /* ── ANIMATED BG (kept for fallback) ── */
-        body::before {
-            content: '';
-            position: fixed; inset: 0; z-index: 0;
-            background:
-                radial-gradient(ellipse 80% 40% at 50% 0%,  rgba(255,248,200,0.35) 0%, transparent 55%),
-                radial-gradient(ellipse 60% 50% at 20% 60%, rgba(100,200,255,0.3)  0%, transparent 60%),
-                radial-gradient(ellipse 60% 50% at 80% 40%, rgba(60,180,240,0.25)  0%, transparent 60%);
-            pointer-events: none;
-        }
-
-        /* ── TOP NAV ── */
-        .nav {
-            position: sticky; top: 0; z-index: 100;
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 32px; height: 64px;
-            background: rgba(255,255,255,0.75);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(6,182,212,0.25);
-            box-shadow: 0 2px 20px rgba(30,140,200,0.12);
-        }
-
-        .nav-brand {
-            display: flex; align-items: center; gap: 10px;
-            font-family: 'Syne', sans-serif;
-            font-size: 17px; font-weight: 800; color: #0c3b6e;
-            text-decoration: none;
-        }
-
-        .nav-brand .drop {
-            width: 32px; height: 32px;
-            background: linear-gradient(135deg, var(--blue), var(--cyan));
-            border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 16px;
-        }
-
-        .live-badge {
-            display: flex; align-items: center; gap: 6px;
-            background: rgba(34,197,94,0.15);
-            border: 1px solid rgba(34,197,94,0.3);
-            color: #4ade80; padding: 4px 12px; border-radius: 20px;
-            font-size: 12px; font-weight: 500;
-        }
-
-        .live-badge::before {
-            content: '';
-            width: 6px; height: 6px; border-radius: 50%;
-            background: #4ade80;
-            animation: pulse-dot 1.5s infinite;
-        }
-
-        @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} }
-
-        .nav-links { display: flex; gap: 4px; }
-
-        .nav-links a {
-            color: #2c6e9e; text-decoration: none;
-            padding: 7px 16px; border-radius: 8px;
-            font-size: 14px; font-weight: 500;
-            transition: all 0.2s;
-        }
-
-        .nav-links a:hover { color: #0c3b6e; background: rgba(6,182,212,0.12); }
-
-        .nav-links a.btn-login-nav {
-            background: linear-gradient(135deg, #1a56db, #2563eb);
-            color: white; padding: 7px 18px; border-radius: 8px;
-            font-weight: 600; font-size: 13px;
-            box-shadow: 0 2px 10px rgba(26,86,219,0.35);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .nav-links a.btn-login-nav:hover {
-            background: linear-gradient(135deg, #1a56db, #2563eb);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 16px rgba(26,86,219,0.5);
-        }
-
-        /* ── HERO ── */
-        .hero {
-            position: relative; z-index: 1;
-            height: calc(100vh - 64px);
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            text-align: center;
-            width: 100%; max-width: 100%; margin: 0;
-            padding: 0 32px;
-        }
-
-        .scroll-hint {
-            position: absolute; bottom: 36px; left: 50%;
-            transform: translateX(-50%);
-            display: flex; flex-direction: column; align-items: center; gap: 8px;
-            color: var(--muted); font-size: 11px; font-weight: 600;
-            letter-spacing: 1px; text-transform: uppercase;
-            cursor: pointer; animation: bounce 2s infinite;
-        }
-        .scroll-hint svg { width: 22px; height: 22px; opacity: 0.5; }
-        @keyframes bounce {
-            0%,100% { transform: translateX(-50%) translateY(0); opacity: 0.7; }
-            50%      { transform: translateX(-50%) translateY(8px); opacity: 1; }
-        }
-
-        .hero-eyebrow {
-            display: inline-flex; align-items: center; gap: 8px;
-            background: rgba(255,255,255,0.7);
-            border: 1px solid rgba(6,182,212,0.4);
-            color: #1a56db; padding: 6px 16px; border-radius: 20px;
-            font-size: 12px; font-weight: 500; letter-spacing: 0.5px;
-            text-transform: uppercase; margin-bottom: 28px;
-            backdrop-filter: blur(8px);
-        }
-
-        .hero h1 {
-            font-family: 'Syne', sans-serif;
-            font-size: clamp(3.5rem, 9vw, 7rem);
-            font-weight: 800; line-height: 1.05;
-            color: #0a2f5a; margin-bottom: 0;
-            letter-spacing: -1px;
-            text-shadow: 0 2px 20px rgba(255,255,255,0.8);
-        }
-
-        .hero h1 span {
-            background: linear-gradient(90deg, #0369a1, #06b6d4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .hero p {
-            font-size: 17px; color: #2c6e9e;
-            line-height: 1.7; max-width: 560px; margin: 0 auto 40px;
-            text-shadow: 0 1px 8px rgba(255,255,255,0.7);
-        }
-
-        /* ── MAIN CARD ── */
-        .main-card {
-            position: relative; z-index: 1;
-            max-width: 860px; margin: 0 auto;
-            padding: 0 20px 80px;
-        }
-
-        .card-inner {
-            background: rgba(255,255,255,0.82);
-            border: 1px solid rgba(6,182,212,0.25);
-            border-radius: 20px;
-            overflow: hidden;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 8px 40px rgba(30,140,200,0.18), 0 2px 8px rgba(0,0,0,0.06);
-        }
-
-        /* ── TABS ── */
-        .tabs {
-            display: flex;
-            border-bottom: 1px solid rgba(6,182,212,0.2);
-            background: rgba(200,238,255,0.35);
-        }
-
-        .tab-btn {
-            flex: 1; padding: 18px 20px;
-            background: none; border: none; cursor: pointer;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 14px; font-weight: 500;
-            color: #4a7fa5;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s;
-            margin-bottom: -1px;
-        }
-
-        .tab-btn:hover { color: #0c3b6e; }
-
-        .tab-btn.active {
-            color: #0369a1;
-            border-bottom-color: #06b6d4;
-            background: rgba(255,255,255,0.6);
-        }
-
-        .tab-btn .tab-icon {
-            width: 20px; height: 20px; border-radius: 6px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 12px;
-        }
-
-        .tab-btn.active .tab-icon { background: rgba(6,182,212,0.15); }
-
-        /* ── TAB PANELS ── */
-        .tab-panel { display: none; padding: 32px; }
-        .tab-panel.active { display: block; }
-
-        /* ── LOCATION SELECTOR ── */
-        .panel-title {
-            font-family: 'Syne', sans-serif;
-            font-size: 18px; font-weight: 700;
-            color: #0c3b6e; margin-bottom: 6px;
-        }
-
-        .panel-sub {
-            font-size: 14px; color: #4a7fa5;
-            margin-bottom: 28px; line-height: 1.5;
-        }
-
-        .select-row {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
-            margin-bottom: 20px;
-        }
-
-        .field-wrap { display: flex; flex-direction: column; gap: 8px; }
-
-        .field-label {
-            font-size: 12px; font-weight: 500;
-            color: #4a7fa5; text-transform: uppercase; letter-spacing: 0.5px;
-        }
-
-        select, input[type="number"] {
-            width: 100%;
-            background: rgba(255,255,255,0.8);
-            border: 1px solid rgba(6,182,212,0.3);
-            border-radius: 10px;
-            color: #0c3b6e;
-            padding: 13px 16px;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 15px;
-            outline: none;
-            appearance: none;
-            -webkit-appearance: none;
-            transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
-            cursor: pointer;
-        }
-
-        select:focus, input[type="number"]:focus {
-            border-color: #06b6d4;
-            background: rgba(255,255,255,0.95);
-            box-shadow: 0 0 0 3px rgba(6,182,212,0.15);
-        }
-
-        select option { background: white; color: #0c3b6e; }
-
-        .select-arrow {
-            position: relative;
-        }
-
-        .select-arrow::after {
-            content: '▾';
-            position: absolute; right: 14px; top: 50%;
-            transform: translateY(-50%);
-            color: var(--muted); pointer-events: none; font-size: 13px;
-        }
-
-        /* ── MANUAL FORM GRID ── */
-        .manual-grid {
-            display: grid; grid-template-columns: repeat(3,1fr); gap: 16px;
-            margin-bottom: 20px;
-        }
-
-        input[type="number"]::placeholder { color: var(--muted); }
-
-        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
-
-        /* ── PREDICT BUTTON ── */
-        .predict-btn {
-            width: 100%; padding: 16px;
-            background: linear-gradient(135deg, var(--blue), var(--blue-dk));
-            border: none; border-radius: 12px;
-            color: white; font-family: 'Syne', sans-serif;
-            font-size: 16px; font-weight: 700;
-            cursor: pointer; letter-spacing: 0.3px;
-            transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
-            box-shadow: 0 4px 20px rgba(26,86,219,0.4);
-            display: flex; align-items: center; justify-content: center; gap: 10px;
-        }
-
-        .predict-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(26,86,219,0.5); }
-        .predict-btn:active { transform: translateY(0); }
-        .predict-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
-        .btn-arrow { font-size: 18px; transition: transform 0.2s; }
-        .predict-btn:hover .btn-arrow { transform: translateX(4px); }
-
-        /* ── RESULT PANEL ── */
-        #result-panel {
-            display: none;
-            margin-top: 24px;
-            border: 1px solid rgba(6,182,212,0.25);
-            border-radius: 14px;
-            overflow: hidden;
-            animation: fadeUp 0.4s ease;
-            background: rgba(255,255,255,0.7);
-        }
-
-        @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-
-        .result-header {
-            padding: 20px 24px;
-            display: flex; align-items: center; justify-content: space-between;
-        }
-
-        .result-header.high     { background: rgba(239,68,68,0.1);   border-bottom: 1px solid rgba(239,68,68,0.2); }
-        .result-header.moderate { background: rgba(245,158,11,0.1);  border-bottom: 1px solid rgba(245,158,11,0.2); }
-        .result-header.low      { background: rgba(34,197,94,0.1);   border-bottom: 1px solid rgba(34,197,94,0.2); }
-
-        .result-risk-label {
-            font-family: 'Syne', sans-serif;
-            font-size: 20px; font-weight: 800;
-        }
-
-        .result-risk-label.high     { color: #dc2626; }
-        .result-risk-label.moderate { color: #d97706; }
-        .result-risk-label.low      { color: #16a34a; }
-
-        .result-location {
-            font-size: 13px; color: #4a7fa5;
-            margin-top: 2px;
-        }
-
-        .prob-pill {
-            padding: 6px 16px; border-radius: 20px;
-            font-size: 14px; font-weight: 700;
-        }
-
-        .prob-pill.high     { background: rgba(239,68,68,0.15);  color: #dc2626; }
-        .prob-pill.moderate { background: rgba(245,158,11,0.15); color: #d97706; }
-        .prob-pill.low      { background: rgba(34,197,94,0.15);  color: #16a34a; }
-
-        .result-body { padding: 20px 24px; }
-
-        .result-metrics {
-            display: grid; grid-template-columns: repeat(3,1fr); gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .metric-box {
-            background: rgba(200,238,255,0.4);
-            border: 1px solid rgba(6,182,212,0.2);
-            border-radius: 10px; padding: 14px;
-            text-align: center;
-        }
-
-        .metric-val { font-size: 1.5rem; font-weight: 700; color: #0c3b6e; margin-bottom: 3px; }
-        .metric-lbl { font-size: 11px; color: #4a7fa5; text-transform: uppercase; letter-spacing: 0.4px; }
-
-        /* Prob bar */
-        .prob-bar-row { margin-bottom: 16px; }
-        .prob-bar-label { font-size: 12px; color: #4a7fa5; margin-bottom: 7px; display: flex; justify-content: space-between; }
-        .prob-track { background: rgba(6,182,212,0.12); border-radius: 6px; height: 8px; overflow: hidden; }
-        .prob-fill { height: 100%; border-radius: 6px; transition: width 1s ease; }
-        .prob-fill.high     { background: linear-gradient(90deg, #f87171, #ef4444); }
-        .prob-fill.moderate { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
-        .prob-fill.low      { background: linear-gradient(90deg, #4ade80, #22c55e); }
-
-        /* Action buttons */
-        .result-actions { display: flex; gap: 10px; }
-
-        .action-btn {
-            flex: 1; padding: 11px;
-            border-radius: 10px; border: 1px solid rgba(6,182,212,0.3);
-            background: rgba(255,255,255,0.7);
-            color: #0c3b6e; font-size: 13px; font-weight: 500;
-            cursor: pointer; text-align: center; text-decoration: none;
-            transition: all 0.2s; font-family: 'DM Sans', sans-serif;
-            display: block;
-        }
-
-        .action-btn:hover { background: rgba(6,182,212,0.12); color: #0369a1; }
-        .action-btn.primary { background: #0369a1; border-color: #0369a1; color: white; }
-        .action-btn.primary:hover { background: #0c3b6e; }
-
-        /* ── LOADING SPINNER ── */
-        .spinner {
-            width: 18px; height: 18px;
-            border: 2px solid rgba(255,255,255,0.2);
-            border-top-color: white;
-            border-radius: 50%;
-            animation: spin 0.7s linear infinite;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* ── STATS ROW ── */
-        .stats-strip {
-            position: relative; z-index: 1;
-            max-width: 860px; margin: 0 auto 0;
-            padding: 0 20px 32px;
-            display: grid; grid-template-columns: repeat(4,1fr); gap: 12px;
-        }
-
-        .strip-card {
-            background: rgba(255,255,255,0.75);
-            border: 1px solid rgba(6,182,212,0.22);
-            border-radius: 14px; padding: 18px 16px;
-            text-align: center;
-            backdrop-filter: blur(12px);
-            box-shadow: 0 2px 12px rgba(30,140,200,0.1);
-        }
-
-        .strip-val {
-            font-family: 'Syne', sans-serif;
-            font-size: 1.6rem; font-weight: 800; color: #0c3b6e;
-            margin-bottom: 4px;
-        }
-
-        .strip-lbl { font-size: 12px; color: #4a7fa5; }
-
-        /* ── FEATURES ── */
-        .features {
-            position: relative; z-index: 1;
-            max-width: 860px; margin: 0 auto;
-            padding: 0 20px 80px;
-            display: grid; grid-template-columns: repeat(3,1fr); gap: 14px;
-        }
-
-        .feat-card {
-            background: rgba(255,255,255,0.75);
-            border: 1px solid rgba(6,182,212,0.2);
-            border-radius: 14px; padding: 22px 20px;
-            backdrop-filter: blur(12px);
-            transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
-        }
-
-        .feat-card:hover { border-color: rgba(6,182,212,0.5); transform: translateY(-3px); box-shadow: 0 8px 24px rgba(30,140,200,0.15); }
-
-        .feat-icon {
-            width: 40px; height: 40px; border-radius: 10px;
-            background: rgba(6,182,212,0.15);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 18px; margin-bottom: 14px;
-        }
-
-        .feat-title { font-size: 14px; font-weight: 700; color: #0c3b6e; margin-bottom: 6px; }
-        .feat-desc  { font-size: 13px; color: #4a7fa5; line-height: 1.6; }
-
-        /* ── LOADING OVERLAY ── */
-        #loading-overlay {
-            display: none;
-            position: fixed; inset: 0; z-index: 999;
-            background: rgba(200,238,255,0.6);
-            backdrop-filter: blur(6px);
-            align-items: center; justify-content: center;
-            flex-direction: column; gap: 16px;
-        }
-
-        #loading-overlay.show { display: flex; }
-
-        .loading-ring {
-            width: 50px; height: 50px;
-            border: 3px solid rgba(6,182,212,0.2);
-            border-top-color: #0369a1;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        .loading-text { font-size: 15px; color: #0c3b6e; font-weight: 600; }
-
-        /* ── ALERT BANNER ── */
-        #alert-banner {
-            display: none;
-            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-            z-index: 200; min-width: 300px; max-width: 480px;
-            padding: 14px 20px; border-radius: 12px;
-            font-size: 14px; font-weight: 500;
-            animation: slideUp 0.3s ease;
-        }
-
-        #alert-banner.error { background: rgba(239,68,68,0.92); color: white; border: 1px solid #ef4444; }
-        #alert-banner.info  { background: rgba(3,105,161,0.92); color: white; border: 1px solid #0369a1; }
-
-        @keyframes slideUp { from{opacity:0;transform:translateX(-50%) translateY(10px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
-
-        .scroll-hint {
-            position: absolute; bottom: 36px; left: 50%;
-            transform: translateX(-50%);
-            display: flex; flex-direction: column; align-items: center; gap: 8px;
-            color: #2c6e9e; font-size: 11px; font-weight: 600;
-            letter-spacing: 1px; text-transform: uppercase;
-            cursor: pointer; animation: bounce 2s infinite;
-        }
-        .scroll-hint svg { width: 22px; height: 22px; opacity: 0.6; }
-
-        @media (max-width: 640px) {
-            .select-row   { grid-template-columns: 1fr; }
-            .manual-grid  { grid-template-columns: 1fr; }
-            .result-metrics { grid-template-columns: 1fr 1fr; }
-            .stats-strip  { grid-template-columns: 1fr 1fr; }
-            .features     { grid-template-columns: 1fr; }
-            .nav-links    { display: none; }
-            .hero         { padding: 0 20px; height: calc(100vh - 64px); }
-            .tab-btn span { display: none; }
+        @media(max-width:480px){
+            .select-row{grid-template-columns:1fr;}
+            .manual-grid{grid-template-columns:1fr;}
+            .result-metrics{grid-template-columns:1fr 1fr;}
+            .stats-strip{grid-template-columns:1fr 1fr;}
+            .features{grid-template-columns:1fr;}
+            .hero h1{font-size:clamp(2.4rem,11vw,3.5rem);}
+            .tab-btn span{display:none;}
+            .tab-panel{padding:20px 16px 24px;}
         }
     </style>
 </head>
 <body>
-
-<!-- WATER CANVAS BACKGROUND -->
 <canvas id="water-bg"></canvas>
 <div class="sun-shimmer"></div>
-
-<!-- LOADING OVERLAY -->
-<div id="loading-overlay">
-    <div class="loading-ring"></div>
-    <div class="loading-text">Analyzing flood risk...</div>
-</div>
-
-<!-- ALERT BANNER -->
+<div id="loading-overlay"><div class="loading-ring"></div><div class="loading-text">Analyzing flood risk&#8230;</div></div>
 <div id="alert-banner"></div>
 
-<!-- NAV -->
 <nav class="nav">
-    <a class="nav-brand" href="/">
-        <div class="drop">🌊</div>
-        FloodWatch India
-    </a>
+    <a class="nav-brand" href="/"><div class="drop">&#127754;</div>FloodWatch India</a>
     <div class="live-badge">Live Monitoring</div>
     <div class="nav-links">
         <a href="/">Home</a>
         <a href="/dashboard">Dashboard</a>
         <a href="/login" class="btn-login-nav">&#128274; Login</a>
     </div>
+    <button class="hamburger" id="hamburger" onclick="toggleMenu()" aria-label="Menu">
+        <span></span><span></span><span></span>
+    </button>
 </nav>
+<div class="mobile-menu" id="mobile-menu">
+    <a href="/">Home</a>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/login" class="btn-login-mobile">&#128274; Login / Register</a>
+</div>
 
-<!-- HERO -->
 <section class="hero">
-    <div class="hero-eyebrow">🌊 AI-Powered Flood Early Warning — India</div>
+    <div class="hero-eyebrow">&#127754; AI-Powered Flood Early Warning &#8212; India</div>
     <h1>Predict <span>Flood Risk</span></h1>
-    <p style="margin-top:20px;">Real-time AI flood prediction for 100+ Indian districts using live weather data, ML models and hydrology.</p>
+    <p>Real-time AI flood prediction for 100+ Indian districts using live weather data, ML models and SCS hydrology.</p>
     <div class="scroll-hint" onclick="document.getElementById('main-content').scrollIntoView({behavior:'smooth'})">
         Scroll down
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 5v14M5 12l7 7 7-7"/>
-        </svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
     </div>
 </section>
 
-<!-- MAIN CARD -->
 <div id="main-content" class="main-card">
     <div class="card-inner">
-
-        <!-- TABS -->
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('location')">
-                <div class="tab-icon">📍</div>
-                <span>By State & District</span>
-            </button>
-            <button class="tab-btn" onclick="switchTab('manual')">
-                <div class="tab-icon">🔢</div>
-                <span>Manual Input</span>
-            </button>
-            <button class="tab-btn" onclick="switchTab('live')">
-                <div class="tab-icon">📡</div>
-                <span>Live Sensors</span>
-            </button>
+            <button class="tab-btn active" onclick="switchTab('location')"><div class="tab-icon">&#128205;</div><span>By State &amp; District</span></button>
+            <button class="tab-btn" onclick="switchTab('manual')"><div class="tab-icon">&#128290;</div><span>Manual Input</span></button>
+            <button class="tab-btn" onclick="switchTab('live')"><div class="tab-icon">&#128225;</div><span>Live Sensors</span></button>
         </div>
 
-        <!-- TAB: LOCATION -->
+        <!-- TAB 1: Location -->
         <div class="tab-panel active" id="panel-location">
             <div class="panel-title">Select Your Location</div>
             <div class="panel-sub">Choose a state and district to get the current flood risk prediction for that area.</div>
-
             <div class="select-row">
                 <div class="field-wrap">
                     <label class="field-label">State</label>
                     <div class="select-arrow">
                         <select id="state-select" onchange="loadDistricts()">
-                            <option value="">— Select State —</option>
+                            <option value="">&#8212; Select State &#8212;</option>
                         </select>
                     </div>
                 </div>
@@ -620,25 +231,21 @@
                     <label class="field-label">District</label>
                     <div class="select-arrow">
                         <select id="district-select" disabled>
-                            <option value="">— Select District —</option>
+                            <option value="">&#8212; Select District &#8212;</option>
                         </select>
                     </div>
                 </div>
             </div>
-
             <button class="predict-btn" id="loc-btn" onclick="predictByLocation()" disabled>
-                <span>Get Flood Prediction</span>
-                <span class="btn-arrow">→</span>
+                <span>Get Flood Prediction</span><span class="btn-arrow">&#8594;</span>
             </button>
-
             <div id="result-panel"></div>
         </div>
 
-        <!-- TAB: MANUAL -->
+        <!-- TAB 2: Manual Input — plain form POST → opens result.html -->
         <div class="tab-panel" id="panel-manual">
             <div class="panel-title">Enter Sensor Readings</div>
             <div class="panel-sub">Input the current sensor readings from your local monitoring equipment.</div>
-
             <form action="/predict" method="POST">
                 <div class="manual-grid">
                     <div class="field-wrap">
@@ -650,554 +257,265 @@
                         <input type="number" name="water_level" placeholder="e.g. 2.5" step="0.01" min="0" required>
                     </div>
                     <div class="field-wrap">
-                        <label class="field-label">River Flow (m³/s)</label>
+                        <label class="field-label">River Flow (m&#179;/s)</label>
                         <input type="number" name="flow_rate" placeholder="e.g. 150" step="0.1" min="0" required>
                     </div>
                 </div>
                 <button type="submit" class="predict-btn">
-                    <span>Predict Flood Risk</span>
-                    <span class="btn-arrow">→</span>
+                    <span>Get Flood Prediction</span><span class="btn-arrow">&#8594;</span>
                 </button>
             </form>
         </div>
 
-        <!-- TAB: LIVE -->
+        <!-- TAB 3: Live Sensors -->
         <div class="tab-panel" id="panel-live">
             <div class="panel-title">Live Sensor Dashboard</div>
-            <div class="panel-sub">Real-time automatic monitoring using live weather data and AI prediction — updates every 5 seconds.</div>
-
-            <div class="result-metrics" style="margin-bottom:24px;">
-                <div class="metric-box">
-                    <div class="metric-val" id="live-rain">--</div>
-                    <div class="metric-lbl">Rainfall mm</div>
-                </div>
-                <div class="metric-box">
-                    <div class="metric-val" id="live-wl">--</div>
-                    <div class="metric-lbl">Water Level m</div>
-                </div>
-                <div class="metric-box">
-                    <div class="metric-val" id="live-flow">--</div>
-                    <div class="metric-lbl">River Flow m³/s</div>
-                </div>
+            <div class="panel-sub">Real-time automatic monitoring using live weather data and AI prediction &#8212; updates every 5 seconds.</div>
+            <div class="result-metrics" style="margin-bottom:22px;">
+                <div class="metric-box"><div class="metric-val" id="live-rain">--</div><div class="metric-lbl">Rainfall mm</div></div>
+                <div class="metric-box"><div class="metric-val" id="live-wl">--</div><div class="metric-lbl">Water Level m</div></div>
+                <div class="metric-box"><div class="metric-val" id="live-flow">--</div><div class="metric-lbl">River Flow m&#179;/s</div></div>
             </div>
-
-            <div id="live-alert" style="padding:14px 18px;border-radius:10px;text-align:center;font-weight:600;font-size:15px;background:rgba(255,255,255,0.05);color:var(--muted);margin-bottom:20px;">
-                Connecting to sensors...
-            </div>
-
-            <a href="/dashboard" class="predict-btn" style="text-decoration:none;display:flex;">
-                <span>Open Full Live Dashboard</span>
-                <span class="btn-arrow">→</span>
+            <div id="live-alert">Connecting to sensors&#8230;</div>
+            <a href="/dashboard" class="predict-btn" style="text-decoration:none;display:flex;margin-top:16px;">
+                <span>Open Full Live Dashboard</span><span class="btn-arrow">&#8594;</span>
             </a>
         </div>
-
     </div>
 </div>
 
-<!-- STATS STRIP -->
 <div class="stats-strip">
-    <div class="strip-card">
-        <div class="strip-val">12</div>
-        <div class="strip-lbl">States Covered</div>
-    </div>
-    <div class="strip-card">
-        <div class="strip-val">100+</div>
-        <div class="strip-lbl">Districts Monitored</div>
-    </div>
-    <div class="strip-card">
-        <div class="strip-val">5s</div>
-        <div class="strip-lbl">Update Interval</div>
-    </div>
-    <div class="strip-card">
-        <div class="strip-val">AI</div>
-        <div class="strip-lbl">Powered Prediction</div>
-    </div>
+    <div class="strip-card"><div class="strip-val">12</div><div class="strip-lbl">States Covered</div></div>
+    <div class="strip-card"><div class="strip-val">100+</div><div class="strip-lbl">Districts Monitored</div></div>
+    <div class="strip-card"><div class="strip-val">5s</div><div class="strip-lbl">Update Interval</div></div>
+    <div class="strip-card"><div class="strip-val">AI</div><div class="strip-lbl">Powered Prediction</div></div>
 </div>
 
-<!-- FEATURES -->
 <div class="features">
-    <div class="feat-card">
-        <div class="feat-icon">📍</div>
-        <div class="feat-title">State & District Coverage</div>
-        <div class="feat-desc">Covers 12 Indian states with 100+ districts. Select any location for instant flood risk analysis.</div>
-    </div>
-    <div class="feat-card">
-        <div class="feat-icon">🌧</div>
-        <div class="feat-title">Live Weather Data</div>
-        <div class="feat-desc">Integrates with OpenWeatherMap API for real-time rainfall, humidity, and storm data.</div>
-    </div>
-    <div class="feat-card">
-        <div class="feat-icon">🤖</div>
-        <div class="feat-title">AI Risk Prediction</div>
-        <div class="feat-desc">Random Forest model trained on flood hydrology data gives High / Moderate / Low risk classification.</div>
-    </div>
-    <div class="feat-card">
-        <div class="feat-icon">🗺</div>
-        <div class="feat-title">Live Map & Shelters</div>
-        <div class="feat-desc">Interactive Leaflet map shows your location risk zone and nearest emergency shelters with navigation.</div>
-    </div>
-    <div class="feat-card">
-        <div class="feat-icon">📡</div>
-        <div class="feat-title">Sensor Integration</div>
-        <div class="feat-desc">Supports Arduino, ESP32, ThingSpeak, MQTT, and USGS sensor APIs for real hardware data.</div>
-    </div>
-    <div class="feat-card">
-        <div class="feat-icon">🚨</div>
-        <div class="feat-title">Smart Alerts</div>
-        <div class="feat-desc">Color-coded warnings with actionable recommendations — monitor continuously and stay safe.</div>
-    </div>
+    <div class="feat-card"><div class="feat-icon">&#128205;</div><div class="feat-title">State &amp; District Coverage</div><div class="feat-desc">Covers 12 Indian states with 100+ districts. Select any location for instant flood risk analysis.</div></div>
+    <div class="feat-card"><div class="feat-icon">&#127783;</div><div class="feat-title">Live Weather Data</div><div class="feat-desc">Integrates with OpenWeatherMap API for real-time rainfall, humidity, and storm data.</div></div>
+    <div class="feat-card"><div class="feat-icon">&#129302;</div><div class="feat-title">AI Risk Prediction</div><div class="feat-desc">ML model trained on flood hydrology data gives High / Moderate / Low risk classification.</div></div>
+    <div class="feat-card"><div class="feat-icon">&#128506;</div><div class="feat-title">Live Map &amp; Shelters</div><div class="feat-desc">Interactive map shows your location risk zone and nearest emergency shelters with navigation.</div></div>
+    <div class="feat-card"><div class="feat-icon">&#128225;</div><div class="feat-title">Sensor Integration</div><div class="feat-desc">Supports Arduino, ESP32, ThingSpeak, MQTT, and USGS sensor APIs for real hardware data.</div></div>
+    <div class="feat-card"><div class="feat-icon">&#128680;</div><div class="feat-title">Smart Alerts</div><div class="feat-desc">Color-coded warnings with actionable recommendations &#8212; monitor continuously and stay safe.</div></div>
 </div>
 
 <script>
-/* ══════════════════════════════════════════
-   TABS
-══════════════════════════════════════════ */
-function switchTab(name) {
-    document.querySelectorAll('.tab-btn').forEach((b, i) => {
-        const panels = ['location','manual','live'];
-        b.classList.toggle('active', panels[i] === name);
+// ── Mobile menu ───────────────────────────────────────────────────
+function toggleMenu(){
+    var m=document.getElementById('mobile-menu'),b=document.getElementById('hamburger');
+    m.classList.toggle('open');b.classList.toggle('open');
+}
+document.addEventListener('click',function(e){
+    var m=document.getElementById('mobile-menu'),b=document.getElementById('hamburger');
+    if(m&&b&&!m.contains(e.target)&&!b.contains(e.target)){m.classList.remove('open');b.classList.remove('open');}
+});
+
+// ── Tab switching ─────────────────────────────────────────────────
+function switchTab(name){
+    document.querySelectorAll('.tab-btn').forEach(function(b,i){
+        b.classList.toggle('active',['location','manual','live'][i]===name);
     });
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    document.getElementById('panel-' + name).classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active');});
+    document.getElementById('panel-'+name).classList.add('active');
 }
 
-/* ══════════════════════════════════════════
-   LOAD STATES ON PAGE LOAD
-══════════════════════════════════════════ */
-async function loadStates() {
-    try {
-        const res  = await fetch('/api/states');
-        const data = await res.json();
-        const sel  = document.getElementById('state-select');
-        data.states.forEach(s => {
-            const opt = document.createElement('option');
-            opt.value = s; opt.textContent = s;
-            sel.appendChild(opt);
+// ── Load states ───────────────────────────────────────────────────
+async function loadStates(){
+    try{
+        var res=await fetch('/api/states'),data=await res.json(),sel=document.getElementById('state-select');
+        data.states.forEach(function(s){
+            var o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);
         });
-    } catch(e) {
-        console.error('Failed to load states:', e);
-    }
+    }catch(e){console.error('Failed to load states:',e);}
 }
 
-/* ══════════════════════════════════════════
-   LOAD DISTRICTS WHEN STATE SELECTED
-══════════════════════════════════════════ */
-async function loadDistricts() {
-    const state    = document.getElementById('state-select').value;
-    const distSel  = document.getElementById('district-select');
-    const locBtn   = document.getElementById('loc-btn');
-
-    distSel.innerHTML = '<option value="">— Select District —</option>';
-    distSel.disabled  = true;
-    locBtn.disabled   = true;
-    document.getElementById('result-panel').style.display = 'none';
-
-    if (!state) return;
-
-    try {
-        const res  = await fetch(`/api/districts/${encodeURIComponent(state)}`);
-        const data = await res.json();
-        data.districts.forEach(d => {
-            const opt = document.createElement('option');
-            opt.value = d; opt.textContent = d;
-            distSel.appendChild(opt);
+// ── Load districts ────────────────────────────────────────────────
+async function loadDistricts(){
+    var state=document.getElementById('state-select').value,
+        distSel=document.getElementById('district-select'),
+        locBtn=document.getElementById('loc-btn');
+    distSel.innerHTML='<option value="">&#8212; Select District &#8212;</option>';
+    distSel.disabled=true;locBtn.disabled=true;
+    document.getElementById('result-panel').style.display='none';
+    if(!state)return;
+    try{
+        var res=await fetch('/api/districts/'+encodeURIComponent(state)),data=await res.json();
+        data.districts.forEach(function(d){
+            var o=document.createElement('option');o.value=d;o.textContent=d;distSel.appendChild(o);
         });
-        distSel.disabled = false;
-        distSel.onchange = () => {
-            locBtn.disabled = !distSel.value;
-        };
-    } catch(e) {
-        showAlert('Failed to load districts.', 'error');
-    }
+        distSel.disabled=false;
+        distSel.onchange=function(){locBtn.disabled=!distSel.value;};
+    }catch(e){showAlert('Failed to load districts.','error');}
 }
 
-/* ══════════════════════════════════════════
-   PREDICT BY LOCATION
-══════════════════════════════════════════ */
-async function predictByLocation() {
-    const state    = document.getElementById('state-select').value;
-    const district = document.getElementById('district-select').value;
-
-    if (!state || !district) {
-        showAlert('Please select both a state and district.', 'error');
-        return;
-    }
+// ── Predict by location (FIXED: handles 401, shows result inline) ─
+async function predictByLocation(){
+    var state=document.getElementById('state-select').value,
+        district=document.getElementById('district-select').value;
+    if(!state||!district){showAlert('Please select both a state and district.','error');return;}
 
     showLoading(true);
-
-    try {
-        const res  = await fetch('/api/district-prediction', {
-            method:  'POST',
-            headers: {'Content-Type': 'application/json'},
-            body:    JSON.stringify({ state, district })
+    try{
+        var res=await fetch('/api/district-prediction',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({state:state,district:district})
         });
-        const data = await res.json();
 
-        if (!data.success) throw new Error(data.error || 'Prediction failed');
+        // ── Not logged in → show login notice instead of crashing ──
+        if(res.status===401){
+            showLoading(false);
+            var panel=document.getElementById('result-panel');
+            panel.innerHTML='<div class="login-notice">&#128274; Please <a href="/login">log in</a> to get district flood predictions. Or use the <b>Manual Input</b> tab — no login needed.</div>';
+            panel.style.display='block';
+            return;
+        }
 
+        var data=await res.json();
+        if(!data.success)throw new Error(data.error||'Prediction failed');
         showLoading(false);
         renderResult(data);
-    } catch(e) {
+
+    }catch(e){
         showLoading(false);
-        showAlert('Prediction failed: ' + e.message, 'error');
+        showAlert('Prediction failed: '+e.message,'error');
     }
 }
 
-/* ══════════════════════════════════════════
-   RENDER RESULT PANEL
-══════════════════════════════════════════ */
-function renderResult(data) {
-    const risk = data.prediction.risk;
-    const prob = data.prediction.probability;
-    const cls  = risk.toLowerCase();
+// ── Render inline result ──────────────────────────────────────────
+function renderResult(data){
+    var risk=data.prediction.risk,
+        prob=data.prediction.probability,
+        cls=risk.toLowerCase();
 
-    const recoHTML = (risk === 'High' || risk === 'Moderate') ? `
-        <div style="margin-top:16px;padding:14px 16px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;">
-            <div style="font-size:12px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Recommended Actions</div>
-            <ul style="list-style:none;padding:0;display:flex;flex-direction:column;gap:6px;">
-                ${['Monitor river and weather updates continuously',
-                   'Alert local authorities and emergency services',
-                   'Evacuate low-lying areas if necessary',
-                   'Move valuables to higher ground',
-                   'Avoid rivers, drains and water bodies']
-                  .map(a => `<li style="font-size:13px;color:#94a3b8;display:flex;gap:8px;"><span style="color:#f59e0b;">→</span>${a}</li>`)
-                  .join('')}
-            </ul>
-        </div>` : '';
+    var recoHTML='';
+    if(risk==='High'||risk==='Moderate'){
+        recoHTML='<div style="margin-top:14px;padding:14px 16px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.18);border-radius:10px;">'
+            +'<div style="font-size:12px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Recommended Actions</div>'
+            +'<ul style="list-style:none;padding:0;display:flex;flex-direction:column;gap:6px;">'
+            +['Monitor river and weather updates continuously',
+              'Alert local authorities and emergency services',
+              'Evacuate low-lying areas if necessary',
+              'Move valuables to higher ground',
+              'Avoid rivers, drains and water bodies']
+              .map(function(a){return'<li style="font-size:13px;color:#4a7fa5;display:flex;gap:8px;"><span style="color:#f59e0b;">&#8250;</span>'+a+'</li>';})
+              .join('')
+            +'</ul></div>';
+    }
 
-    const panel = document.getElementById('result-panel');
-    panel.innerHTML = `
-        <div class="result-header ${cls}">
-            <div>
-                <div class="result-risk-label ${cls}">
-                    ${ risk === 'High' ? '⚠ HIGH FLOOD RISK' : risk === 'Moderate' ? '⚡ MODERATE RISK' : '✓ LOW RISK — SAFE' }
-                </div>
-                <div class="result-location">${data.district}, ${data.state} · ${data.timestamp}</div>
-            </div>
-            <div class="prob-pill ${cls}">${prob}%</div>
-        </div>
-        <div class="result-body">
-            <div class="result-metrics">
-                <div class="metric-box">
-                    <div class="metric-val">${data.rainfall}</div>
-                    <div class="metric-lbl">Rainfall mm</div>
-                </div>
-                <div class="metric-box">
-                    <div class="metric-val">${data.water_level}</div>
-                    <div class="metric-lbl">Water Level m</div>
-                </div>
-                <div class="metric-box">
-                    <div class="metric-val">${data.flow_rate}</div>
-                    <div class="metric-lbl">River Flow m³/s</div>
-                </div>
-            </div>
-            <div class="prob-bar-row">
-                <div class="prob-bar-label">
-                    <span>Flood Probability</span>
-                    <span>${prob}%</span>
-                </div>
-                <div class="prob-track">
-                    <div class="prob-fill ${cls}" style="width:${prob}%;"></div>
-                </div>
-            </div>
-            ${recoHTML}
-            <div class="result-actions" style="margin-top:16px;">
-                <a href="/dashboard" class="action-btn primary">Open Live Dashboard →</a>
-                <button class="action-btn" onclick="resetForm()">Try Another Location</button>
-            </div>
-        </div>`;
+    var riskLabel = risk==='High'
+        ? '&#9888; HIGH FLOOD RISK'
+        : risk==='Moderate'
+            ? '&#9889; MODERATE RISK'
+            : '&#10003; LOW RISK &#8212; SAFE';
 
-    panel.style.display = 'block';
-    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    var panel=document.getElementById('result-panel');
+    panel.innerHTML=
+        '<div class="result-header '+cls+'">'
+            +'<div>'
+                +'<div class="result-risk-label '+cls+'">'+riskLabel+'</div>'
+                +'<div class="result-location">'+data.district+', '+data.state+' &middot; '+data.timestamp+'</div>'
+            +'</div>'
+            +'<div class="prob-pill '+cls+'">'+prob+'%</div>'
+        +'</div>'
+        +'<div class="result-body">'
+            +'<div class="result-metrics">'
+                +'<div class="metric-box"><div class="metric-val">'+data.rainfall+'</div><div class="metric-lbl">Rainfall mm</div></div>'
+                +'<div class="metric-box"><div class="metric-val">'+data.water_level+'</div><div class="metric-lbl">Water Level m</div></div>'
+                +'<div class="metric-box"><div class="metric-val">'+data.flow_rate+'</div><div class="metric-lbl">River Flow m&#179;/s</div></div>'
+            +'</div>'
+            +'<div class="prob-bar-row">'
+                +'<div class="prob-bar-label"><span>Flood Probability</span><span>'+prob+'%</span></div>'
+                +'<div class="prob-track"><div class="prob-fill '+cls+'" style="width:'+prob+'%;"></div></div>'
+            +'</div>'
+            +recoHTML
+            +'<div class="result-actions" style="margin-top:14px;">'
+                +'<a href="/dashboard" class="action-btn primary">Open Live Dashboard &#8594;</a>'
+                +'<button class="action-btn" onclick="resetForm()">Try Another Location</button>'
+            +'</div>'
+        +'</div>';
+
+    panel.style.display='block';
+    panel.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-function resetForm() {
-    document.getElementById('result-panel').style.display = 'none';
-    document.getElementById('state-select').value    = '';
-    document.getElementById('district-select').innerHTML = '<option value="">— Select District —</option>';
-    document.getElementById('district-select').disabled  = true;
-    document.getElementById('loc-btn').disabled = true;
+function resetForm(){
+    document.getElementById('result-panel').style.display='none';
+    document.getElementById('state-select').value='';
+    document.getElementById('district-select').innerHTML='<option value="">&#8212; Select District &#8212;</option>';
+    document.getElementById('district-select').disabled=true;
+    document.getElementById('loc-btn').disabled=true;
 }
 
-/* ══════════════════════════════════════════
-   LIVE SENSOR POLL (Live tab)
-══════════════════════════════════════════ */
-function pollLive() {
+// ── Live sensor poll ──────────────────────────────────────────────
+function pollLive(){
     fetch('/api/realtime-data')
-        .then(r => r.json())
-        .then(data => {
-            document.getElementById('live-rain').textContent = data.rainfall;
-            document.getElementById('live-wl').textContent   = data.water_level;
-            document.getElementById('live-flow').textContent = data.flow_rate;
-
-            const box  = document.getElementById('live-alert');
-            const risk = data.prediction.risk;
-            const prob = data.prediction.probability;
-
-            box.style.background = risk === 'High' ? 'rgba(239,68,68,0.15)' :
-                                   risk === 'Moderate' ? 'rgba(245,158,11,0.15)' :
-                                   'rgba(34,197,94,0.15)';
-            box.style.color = risk === 'High' ? '#f87171' :
-                              risk === 'Moderate' ? '#fbbf24' : '#4ade80';
-            box.textContent = risk === 'High'     ? `⚠ FLOOD WARNING — High Risk (${prob}%)` :
-                              risk === 'Moderate'  ? `⚡ Moderate Risk Detected (${prob}%)` :
-                                                     `✓ Safe Conditions — Low Risk (${prob}%)`;
-        })
-        .catch(() => {});
+        .then(function(r){return r.json();})
+        .then(function(data){
+            document.getElementById('live-rain').textContent=data.rainfall;
+            document.getElementById('live-wl').textContent=data.water_level;
+            document.getElementById('live-flow').textContent=data.flow_rate;
+            var box=document.getElementById('live-alert'),
+                risk=data.prediction.risk,
+                prob=data.prediction.probability;
+            box.style.background=risk==='High'?'rgba(239,68,68,.12)':risk==='Moderate'?'rgba(245,158,11,.12)':'rgba(34,197,94,.12)';
+            box.style.color=risk==='High'?'#dc2626':risk==='Moderate'?'#d97706':'#16a34a';
+            box.textContent=risk==='High'?'\u26a0 FLOOD WARNING \u2014 High Risk ('+prob+'%)'
+                :risk==='Moderate'?'\u26a1 Moderate Risk Detected ('+prob+'%)'
+                :'\u2713 Safe Conditions \u2014 Low Risk ('+prob+'%)';
+        }).catch(function(){});
 }
-
 pollLive();
-setInterval(pollLive, 5000);
+setInterval(pollLive,5000);
 
-/* ══════════════════════════════════════════
-   HELPERS
-══════════════════════════════════════════ */
-function showLoading(show) {
-    const el = document.getElementById('loading-overlay');
-    el.classList.toggle('show', show);
+// ── Helpers ───────────────────────────────────────────────────────
+function showLoading(show){document.getElementById('loading-overlay').classList.toggle('show',show);}
+function showAlert(msg,type){
+    type=type||'info';
+    var el=document.getElementById('alert-banner');
+    el.textContent=msg;el.className=type;el.style.display='block';
+    setTimeout(function(){el.style.display='none';},3500);
 }
 
-function showAlert(msg, type = 'info') {
-    const el = document.getElementById('alert-banner');
-    el.textContent = msg;
-    el.className   = type;
-    el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, 3500);
-}
-
-// Init
 loadStates();
 
-/* ══════════════════════════════════════════════════════
-   LIGHT WATER FLOW CANVAS
-   Real flowing river — bright daylight, turquoise water,
-   white foam crests, golden sunlight reflections, ripples
-══════════════════════════════════════════════════════ */
-(function() {
-    var canvas = document.getElementById('water-bg');
-    var ctx    = canvas.getContext('2d');
-    var W, H, t = 0;
-
-    // Sky-to-water gradient layers — bright daylight palette
-    var waves = [
-        { amp:30, freq:0.006, speed:0.014, yR:0.52, col:'rgba(144,210,244,0.95)'  },
-        { amp:24, freq:0.009, speed:0.020, yR:0.55, col:'rgba(100,195,240,0.92)'  },
-        { amp:19, freq:0.013, speed:0.028, yR:0.58, col:'rgba(64,175,230,0.88)'   },
-        { amp:15, freq:0.017, speed:0.036, yR:0.60, col:'rgba(32,155,218,0.82)'   },
-        { amp:11, freq:0.022, speed:0.045, yR:0.63, col:'rgba(14,140,204,0.72)'   },
-        { amp:7,  freq:0.030, speed:0.056, yR:0.66, col:'rgba(6,182,212,0.55)'    },
-        { amp:4,  freq:0.040, speed:0.070, yR:0.68, col:'rgba(125,225,245,0.35)'  },
+// ── Animated water background ─────────────────────────────────────
+(function(){
+    var canvas=document.getElementById('water-bg'),ctx=canvas.getContext('2d'),W,H,t=0;
+    var waves=[
+        {amp:30,freq:.006,speed:.014,yR:.52,col:'rgba(144,210,244,.95)'},
+        {amp:24,freq:.009,speed:.020,yR:.55,col:'rgba(100,195,240,.92)'},
+        {amp:19,freq:.013,speed:.028,yR:.58,col:'rgba(64,175,230,.88)'},
+        {amp:15,freq:.017,speed:.036,yR:.60,col:'rgba(32,155,218,.82)'},
+        {amp:11,freq:.022,speed:.045,yR:.63,col:'rgba(14,140,204,.72)'},
+        {amp:7, freq:.030,speed:.056,yR:.66,col:'rgba(6,182,212,.55)'},
+        {amp:4, freq:.040,speed:.070,yR:.68,col:'rgba(125,225,245,.35)'}
     ];
-
-    // Foam / white sparkle particles
-    var sparks = [];
-    function mkSpark(x) {
-        return {
-            x:     x != null ? x : Math.random() * W,
-            y:     H * 0.5 + Math.random() * H * 0.5,
-            vx:    (Math.random() - 0.4) * 0.7,
-            vy:    -(Math.random() * 0.5 + 0.1),
-            r:     Math.random() * 2.2 + 0.4,
-            a:     Math.random() * 0.7 + 0.2,
-            life:  0, max: Math.random() * 160 + 80
-        };
-    }
-
-    // Sunlight sparkle glints
-    var glints = [];
-    function mkGlint() {
-        return {
-            x:    Math.random() * W,
-            y:    H * 0.4 + Math.random() * H * 0.45,
-            r:    Math.random() * 3 + 1,
-            a:    0, maxA: Math.random() * 0.9 + 0.3,
-            life: 0, max: Math.random() * 80 + 40,
-            grow: true
-        };
-    }
-
-    // Flowing current streaks
-    var currents = [];
-    function mkCurrent(fromTop) {
-        return {
-            x: Math.random() * W,
-            y: fromTop ? H * 0.5 : H * 0.5 + Math.random() * H * 0.5,
-            spd: Math.random() * 1.2 + 0.4,
-            len: Math.random() * 80 + 30,
-            a:   Math.random() * 0.12 + 0.03,
-            w:   Math.random() * 1.2 + 0.3,
-            drift: (Math.random() - 0.5) * 0.2
-        };
-    }
-
-    function init() {
-        W = canvas.width  = window.innerWidth;
-        H = canvas.height = window.innerHeight;
-        sparks   = Array.from({length:100}, function() { return mkSpark(); });
-        glints   = Array.from({length:40},  function() { return mkGlint(); });
-        currents = Array.from({length:20},  function() { return mkCurrent(false); });
-    }
-    window.addEventListener('resize', init);
-    init();
-
-    function frame() {
+    var sparks=[],glints=[],currents=[];
+    function mkSpark(x){return{x:x!=null?x:Math.random()*W,y:H*.5+Math.random()*H*.5,vx:(Math.random()-.4)*.7,vy:-(Math.random()*.5+.1),r:Math.random()*2.2+.4,a:Math.random()*.7+.2,life:0,max:Math.random()*160+80};}
+    function mkGlint(){return{x:Math.random()*W,y:H*.4+Math.random()*H*.45,r:Math.random()*3+1,a:0,maxA:Math.random()*.9+.3,life:0,max:Math.random()*80+40,grow:true};}
+    function mkCurrent(ft){return{x:Math.random()*W,y:ft?H*.5:H*.5+Math.random()*H*.5,spd:Math.random()*1.2+.4,len:Math.random()*80+30,a:Math.random()*.12+.03,w:Math.random()*1.2+.3,drift:(Math.random()-.5)*.2};}
+    function init(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;sparks=Array.from({length:100},function(){return mkSpark();});glints=Array.from({length:40},function(){return mkGlint();});currents=Array.from({length:20},function(){return mkCurrent(false);});}
+    window.addEventListener('resize',init);init();
+    function frame(){
         t++;
-
-        /* ── Sky gradient (top portion) ── */
-        var sky = ctx.createLinearGradient(0, 0, 0, H * 0.6);
-        sky.addColorStop(0,    '#e0f4ff');
-        sky.addColorStop(0.25, '#c8eeff');
-        sky.addColorStop(0.5,  '#b0e4ff');
-        sky.addColorStop(1,    '#7dd4f8');
-        ctx.fillStyle = sky;
-        ctx.fillRect(0, 0, W, H);
-
-        /* ── Sun glow ── */
-        var sunX = W * 0.75, sunY = H * 0.08;
-        var sg = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, W * 0.28);
-        sg.addColorStop(0,    'rgba(255,248,180,0.55)');
-        sg.addColorStop(0.4,  'rgba(255,240,120,0.18)');
-        sg.addColorStop(1,    'transparent');
-        ctx.fillStyle = sg;
-        ctx.fillRect(0, 0, W, H);
-
-        /* ── Subtle cloud blobs ── */
-        for (var c = 0; c < 4; c++) {
-            var cx = ((t * 0.2 + c * 280) % (W + 300)) - 150;
-            var cy = H * (0.08 + c * 0.06);
-            var cr = ctx.createRadialGradient(cx, cy, 0, cx, cy, 90 + c * 30);
-            cr.addColorStop(0,   'rgba(255,255,255,0.45)');
-            cr.addColorStop(0.6, 'rgba(255,255,255,0.12)');
-            cr.addColorStop(1,   'transparent');
-            ctx.fillStyle = cr;
-            ctx.fillRect(0, 0, W, H);
-        }
-
-        /* ── Sunlight reflection column on water ── */
-        var refX = sunX + Math.sin(t * 0.008) * 30;
-        var ref  = ctx.createLinearGradient(refX - 60, H * 0.45, refX + 60, H);
-        ref.addColorStop(0,   'rgba(255,248,180,0)');
-        ref.addColorStop(0.3, 'rgba(255,248,180,0.22)');
-        ref.addColorStop(0.7, 'rgba(255,235,100,0.14)');
-        ref.addColorStop(1,   'rgba(255,235,100,0)');
-        ctx.fillStyle = ref;
-        ctx.beginPath();
-        ctx.moveTo(refX - 20, H * 0.48);
-        ctx.lineTo(refX + 20, H * 0.48);
-        ctx.lineTo(refX + 80, H);
-        ctx.lineTo(refX - 80, H);
-        ctx.fill();
-
-        /* ── Current streaks (underwater flow lines) ── */
-        for (var i = 0; i < currents.length; i++) {
-            var cu = currents[i];
-            cu.y   += cu.spd;
-            cu.x   += cu.drift;
-            if (cu.y > H + cu.len) { currents[i] = mkCurrent(true); continue; }
-            ctx.beginPath();
-            ctx.moveTo(cu.x, cu.y);
-            ctx.lineTo(cu.x + cu.drift * 15, cu.y - cu.len);
-            var lg = ctx.createLinearGradient(cu.x, cu.y, cu.x, cu.y - cu.len);
-            lg.addColorStop(0,   'rgba(255,255,255,0)');
-            lg.addColorStop(0.5, 'rgba(255,255,255,' + cu.a + ')');
-            lg.addColorStop(1,   'rgba(255,255,255,0)');
-            ctx.strokeStyle = lg; ctx.lineWidth = cu.w; ctx.stroke();
-        }
-
-        /* ── Wave layers ── */
-        for (var w = waves.length - 1; w >= 0; w--) {
-            var wv = waves[w], bY = H * wv.yR;
-            ctx.beginPath(); ctx.moveTo(0, H);
-            for (var x = 0; x <= W; x += 3) {
-                var y = Math.sin(x * wv.freq + t * wv.speed) * wv.amp
-                      + Math.sin(x * wv.freq * 1.7 + t * wv.speed * 0.75 + 1.4) * (wv.amp * 0.38)
-                      + Math.sin(x * wv.freq * 0.45 + t * wv.speed * 1.3  + 2.8) * (wv.amp * 0.2);
-                ctx.lineTo(x, bY + y);
-            }
-            ctx.lineTo(W, H); ctx.closePath();
-            ctx.fillStyle = wv.col; ctx.fill();
-        }
-
-        /* ── Bright foam crest highlight ── */
-        var tv = waves[5];
-        ctx.beginPath();
-        for (var x = 0; x <= W; x += 3) {
-            var sy = Math.sin(x * tv.freq + t * tv.speed) * tv.amp
-                   + Math.sin(x * 0.018   + t * 0.055 + 2) * 4;
-            x === 0 ? ctx.moveTo(x, H * tv.yR + sy) : ctx.lineTo(x, H * tv.yR + sy);
-        }
-        ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2; ctx.stroke();
-
-        /* ── Secondary foam crest ── */
-        var tv2 = waves[4];
-        ctx.beginPath();
-        for (var x = 0; x <= W; x += 3) {
-            var sy2 = Math.sin(x * tv2.freq + t * tv2.speed + 1) * tv2.amp
-                    + Math.sin(x * 0.025 + t * 0.04 + 1) * 3;
-            x === 0 ? ctx.moveTo(x, H * tv2.yR + sy2) : ctx.lineTo(x, H * tv2.yR + sy2);
-        }
-        ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = 1.5; ctx.stroke();
-
-        /* ── White foam sparkles ── */
-        for (var s = 0; s < sparks.length; s++) {
-            var sp = sparks[s];
-            sp.x += sp.vx; sp.y += sp.vy; sp.life++;
-            var p = sp.life / sp.max;
-            var a = sp.a * (p < 0.2 ? p/0.2 : Math.max(0, 1 - (p-0.2)/0.8));
-            ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,255,255,' + a + ')'; ctx.fill();
-            if (sp.life >= sp.max || sp.y < 0) sparks[s] = mkSpark();
-        }
-
-        /* ── Sunlight glints on water surface ── */
-        for (var g = 0; g < glints.length; g++) {
-            var gl = glints[g];
-            gl.life++;
-            if (gl.grow) { gl.a += 0.04; if (gl.a >= gl.maxA) gl.grow = false; }
-            else          { gl.a -= 0.03; }
-            if (gl.a <= 0 || gl.life >= gl.max) { glints[g] = mkGlint(); continue; }
-            ctx.beginPath();
-            ctx.arc(gl.x, gl.y, gl.r, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,248,150,' + gl.a + ')';
-            ctx.fill();
-            // Star cross glow
-            ctx.strokeStyle = 'rgba(255,248,150,' + (gl.a * 0.5) + ')';
-            ctx.lineWidth = 0.7;
-            ctx.beginPath(); ctx.moveTo(gl.x - gl.r * 3, gl.y); ctx.lineTo(gl.x + gl.r * 3, gl.y); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(gl.x, gl.y - gl.r * 3); ctx.lineTo(gl.x, gl.y + gl.r * 3); ctx.stroke();
-        }
-
-        /* ── Auto ripple rings ── */
-        if (t % 70 === 0) spawnRipple(Math.random() * W, H * 0.5 + Math.random() * H * 0.5);
-
+        var sky=ctx.createLinearGradient(0,0,0,H*.6);sky.addColorStop(0,'#e0f4ff');sky.addColorStop(.25,'#c8eeff');sky.addColorStop(.5,'#b0e4ff');sky.addColorStop(1,'#7dd4f8');ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+        var sunX=W*.75,sunY=H*.08,sg=ctx.createRadialGradient(sunX,sunY,0,sunX,sunY,W*.28);sg.addColorStop(0,'rgba(255,248,180,.55)');sg.addColorStop(.4,'rgba(255,240,120,.18)');sg.addColorStop(1,'transparent');ctx.fillStyle=sg;ctx.fillRect(0,0,W,H);
+        for(var c=0;c<4;c++){var cx=((t*.2+c*280)%(W+300))-150,cy=H*(.08+c*.06),cr=ctx.createRadialGradient(cx,cy,0,cx,cy,90+c*30);cr.addColorStop(0,'rgba(255,255,255,.45)');cr.addColorStop(.6,'rgba(255,255,255,.12)');cr.addColorStop(1,'transparent');ctx.fillStyle=cr;ctx.fillRect(0,0,W,H);}
+        var refX=sunX+Math.sin(t*.008)*30,ref=ctx.createLinearGradient(refX-60,H*.45,refX+60,H);ref.addColorStop(0,'rgba(255,248,180,0)');ref.addColorStop(.3,'rgba(255,248,180,.22)');ref.addColorStop(.7,'rgba(255,235,100,.14)');ref.addColorStop(1,'rgba(255,235,100,0)');ctx.fillStyle=ref;ctx.beginPath();ctx.moveTo(refX-20,H*.48);ctx.lineTo(refX+20,H*.48);ctx.lineTo(refX+80,H);ctx.lineTo(refX-80,H);ctx.fill();
+        for(var i=0;i<currents.length;i++){var cu=currents[i];cu.y+=cu.spd;cu.x+=cu.drift;if(cu.y>H+cu.len){currents[i]=mkCurrent(true);continue;}ctx.beginPath();ctx.moveTo(cu.x,cu.y);ctx.lineTo(cu.x+cu.drift*15,cu.y-cu.len);var lg=ctx.createLinearGradient(cu.x,cu.y,cu.x,cu.y-cu.len);lg.addColorStop(0,'rgba(255,255,255,0)');lg.addColorStop(.5,'rgba(255,255,255,'+cu.a+')');lg.addColorStop(1,'rgba(255,255,255,0)');ctx.strokeStyle=lg;ctx.lineWidth=cu.w;ctx.stroke();}
+        for(var w=waves.length-1;w>=0;w--){var wv=waves[w],bY=H*wv.yR;ctx.beginPath();ctx.moveTo(0,H);for(var x=0;x<=W;x+=3){var y=Math.sin(x*wv.freq+t*wv.speed)*wv.amp+Math.sin(x*wv.freq*1.7+t*wv.speed*.75+1.4)*(wv.amp*.38)+Math.sin(x*wv.freq*.45+t*wv.speed*1.3+2.8)*(wv.amp*.2);ctx.lineTo(x,bY+y);}ctx.lineTo(W,H);ctx.closePath();ctx.fillStyle=wv.col;ctx.fill();}
+        var tv=waves[5];ctx.beginPath();for(var x=0;x<=W;x+=3){var sy=Math.sin(x*tv.freq+t*tv.speed)*tv.amp+Math.sin(x*.018+t*.055+2)*4;x===0?ctx.moveTo(x,H*tv.yR+sy):ctx.lineTo(x,H*tv.yR+sy);}ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=2;ctx.stroke();
+        for(var s=0;s<sparks.length;s++){var sp=sparks[s];sp.x+=sp.vx;sp.y+=sp.vy;sp.life++;var p=sp.life/sp.max,a=sp.a*(p<.2?p/.2:Math.max(0,1-(p-.2)/.8));ctx.beginPath();ctx.arc(sp.x,sp.y,sp.r,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,'+a+')';ctx.fill();if(sp.life>=sp.max||sp.y<0)sparks[s]=mkSpark();}
+        for(var g=0;g<glints.length;g++){var gl=glints[g];gl.life++;if(gl.grow){gl.a+=.04;if(gl.a>=gl.maxA)gl.grow=false;}else{gl.a-=.03;}if(gl.a<=0||gl.life>=gl.max){glints[g]=mkGlint();continue;}ctx.beginPath();ctx.arc(gl.x,gl.y,gl.r,0,Math.PI*2);ctx.fillStyle='rgba(255,248,150,'+gl.a+')';ctx.fill();ctx.strokeStyle='rgba(255,248,150,'+(gl.a*.5)+')';ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(gl.x-gl.r*3,gl.y);ctx.lineTo(gl.x+gl.r*3,gl.y);ctx.stroke();ctx.beginPath();ctx.moveTo(gl.x,gl.y-gl.r*3);ctx.lineTo(gl.x,gl.y+gl.r*3);ctx.stroke();}
+        if(t%70===0)spawnRipple(Math.random()*W,H*.5+Math.random()*H*.5);
         requestAnimationFrame(frame);
     }
     frame();
-
-    function spawnRipple(x, y) {
-        var el = document.createElement('div');
-        var sz = Math.random() * 100 + 40;
-        el.style.cssText = [
-            'position:fixed', 'z-index:2', 'border-radius:50%', 'pointer-events:none',
-            'border:1.5px solid rgba(255,255,255,0.55)',
-            'animation:ripple-light 1.8s ease-out forwards',
-            'width:' + sz + 'px', 'height:' + sz + 'px',
-            'left:' + (x - sz/2) + 'px', 'top:' + (y - sz/2) + 'px'
-        ].join(';');
-        document.body.appendChild(el);
-        setTimeout(function() { el.remove(); }, 1800);
-    }
-
-    // Inject ripple keyframe
-    var style = document.createElement('style');
-    style.textContent = '@keyframes ripple-light{0%{transform:scale(0);opacity:0.8}100%{transform:scale(1);opacity:0}}';
-    document.head.appendChild(style);
-
-    // Click ripple
-    document.addEventListener('click', function(e) {
-        spawnRipple(e.clientX, e.clientY);
-        setTimeout(function() { spawnRipple(e.clientX + 8, e.clientY + 4); }, 100);
-    });
+    function spawnRipple(x,y){var el=document.createElement('div'),sz=Math.random()*100+40;el.style.cssText=['position:fixed','z-index:2','border-radius:50%','pointer-events:none','border:1.5px solid rgba(255,255,255,.55)','animation:ripple-light 1.8s ease-out forwards','width:'+sz+'px','height:'+sz+'px','left:'+(x-sz/2)+'px','top:'+(y-sz/2)+'px'].join(';');document.body.appendChild(el);setTimeout(function(){el.remove();},1800);}
+    var style=document.createElement('style');style.textContent='@keyframes ripple-light{0%{transform:scale(0);opacity:.8}100%{transform:scale(1);opacity:0}}';document.head.appendChild(style);
+    document.addEventListener('click',function(e){spawnRipple(e.clientX,e.clientY);setTimeout(function(){spawnRipple(e.clientX+8,e.clientY+4);},100);});
 })();
 </script>
 </body>
