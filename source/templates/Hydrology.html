@@ -1,169 +1,153 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hydrology — Flood Prediction System</title>
+    <title>Hydrology — FloodWatch India</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
     <style>
-        :root {
-            --deep:   #edf6ff; --abyss: #e8f4fd; --navy: #ddeeff; --ocean: #c5e4f7;
-            --teal:   #0891b2; --cyan:  #0369a1; --ice:  #0ea5e9; --foam:  #1e3a5f;
-            --danger: #dc2626; --warn:  #d97706; --safe: #16a34a;
-            --glass:  rgba(255,255,255,0.78); --glass2: rgba(200,230,255,0.55);
-            --border: rgba(14,165,233,0.2);   --glow:   0 2px 16px rgba(14,165,233,0.15);
-        }
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body { background:#edf6ff; color:#1e3a5f; font-family:'Exo 2',sans-serif; min-height:100vh; overflow-x:hidden; }
-        body::before {
-            content:''; position:fixed; inset:0; z-index:0;
-            background:
-                radial-gradient(ellipse 70% 50% at 10% 20%,  rgba(186,230,255,0.65) 0%, transparent 55%),
-                radial-gradient(ellipse 60% 50% at 90% 80%,  rgba(147,210,255,0.55) 0%, transparent 55%),
-                radial-gradient(ellipse 80% 40% at 50% 100%, rgba(186,230,255,0.4)  0%, transparent 50%),
-                linear-gradient(180deg, #dbeeff 0%, #eaf5ff 35%, #f0f9ff 70%, #e8f4fd 100%);
-            pointer-events:none;
-        }
-        body::after {
-            content:''; position:fixed; inset:0; z-index:0;
-            background-image:
-                repeating-linear-gradient(0deg,  transparent,transparent 40px,rgba(14,165,233,0.04) 40px,rgba(14,165,233,0.04) 41px),
-                repeating-linear-gradient(90deg, transparent,transparent 40px,rgba(14,165,233,0.04) 40px,rgba(14,165,233,0.04) 41px);
-            pointer-events:none;
-        }
-        .wave-container { position:fixed; bottom:0; left:0; right:0; height:100px; z-index:0; overflow:hidden; pointer-events:none; }
-        .wave { position:absolute; bottom:0; left:-100%; width:300%; height:100%;
-            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120'%3E%3Cpath d='M0,60 C150,100 350,20 600,60 C850,100 1050,20 1200,60 L1200,120 L0,120 Z' fill='rgba(14,165,233,0.08)'/%3E%3C/svg%3E") repeat-x;
-            background-size:600px 100px; }
-        .wave1{animation:wave 8s linear infinite;}
-        .wave2{animation:wave 12s linear infinite reverse;opacity:.5;bottom:6px;}
-        .wave3{animation:wave 6s linear infinite;opacity:.25;bottom:12px;}
+        :root{--brand:#0369a1;--accent:#0891b2;--danger:#dc2626;--warn:#d97706;--safe:#16a34a;--bg:#edf6ff;--glass:rgba(255,255,255,0.82);--border:rgba(14,165,233,0.2);--text:#1e3a5f;--muted:#4a7fa5;}
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{background:var(--bg);color:var(--text);font-family:'Exo 2',sans-serif;min-height:100vh;overflow-x:hidden;}
+        body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 70% 50% at 10% 20%,rgba(186,230,255,.65) 0%,transparent 55%),radial-gradient(ellipse 60% 50% at 90% 80%,rgba(147,210,255,.55) 0%,transparent 55%),linear-gradient(180deg,#dbeeff 0%,#eaf5ff 40%,#f0f9ff 100%);}
+        .wave-container{position:fixed;bottom:0;left:0;right:0;height:100px;z-index:0;overflow:hidden;pointer-events:none;}
+        .wave{position:absolute;bottom:0;left:-100%;width:300%;height:100%;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120'%3E%3Cpath d='M0,60 C150,100 350,20 600,60 C850,100 1050,20 1200,60 L1200,120 L0,120 Z' fill='rgba(14,165,233,0.07)'/%3E%3C/svg%3E") repeat-x;background-size:600px 100px;}
+        .wave1{animation:wave 8s linear infinite;}.wave2{animation:wave 12s linear infinite reverse;opacity:.5;bottom:6px;}.wave3{animation:wave 6s linear infinite;opacity:.25;bottom:12px;}
         @keyframes wave{from{transform:translateX(0)}to{transform:translateX(33.33%)}}
 
         /* TOPBAR */
-        .topbar { position:sticky;top:0;z-index:200; background:rgba(255,255,255,0.88);backdrop-filter:blur(20px);
-            border-bottom:1px solid rgba(14,165,233,0.2);box-shadow:0 2px 16px rgba(14,165,233,0.1);
-            padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:64px; }
-        .topbar-left{display:flex;align-items:center;gap:14px;}
-        .topbar-left h1{font-family:'Orbitron',sans-serif;font-size:15px;font-weight:700;color:#0369a1;letter-spacing:1px;}
-        .live-pill{display:inline-flex;align-items:center;gap:6px;background:rgba(14,165,233,0.1);border:1px solid rgba(14,165,233,0.3);padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;color:#0369a1;letter-spacing:1px;}
-        .topbar nav a{color:#4a7fa5;text-decoration:none;font-family:'Exo 2',sans-serif;font-size:13px;font-weight:600;margin-left:8px;padding:7px 16px;border-radius:8px;border:1px solid transparent;transition:all 0.2s;letter-spacing:0.5px;}
-        .topbar nav a:hover,.topbar nav a.active{background:rgba(200,230,255,0.55);border-color:rgba(14,165,233,0.2);color:#0369a1;}
-        .topbar nav a.nav-logout{background:rgba(220,38,38,0.08);border-color:rgba(220,38,38,0.2);color:#dc2626;}
+        .topbar{position:sticky;top:0;z-index:200;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);box-shadow:0 2px 16px rgba(14,165,233,.1);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:64px;}
+        .topbar-left{display:flex;align-items:center;gap:12px;}
+        .topbar-left h1{font-family:'Orbitron',sans-serif;font-size:14px;font-weight:700;color:var(--brand);letter-spacing:.8px;}
+        .live-pill{display:inline-flex;align-items:center;gap:5px;background:rgba(14,165,233,.09);border:1px solid rgba(14,165,233,.25);padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;color:var(--brand);letter-spacing:1px;}
+        .topbar nav{display:flex;gap:4px;}
+        .topbar nav a{color:var(--muted);text-decoration:none;font-family:'Exo 2',sans-serif;font-size:13px;font-weight:600;padding:7px 14px;border-radius:8px;border:1px solid transparent;transition:all .2s;}
+        .topbar nav a:hover,.topbar nav a.active{background:rgba(14,165,233,.09);border-color:var(--border);color:var(--brand);}
+        .topbar nav a.nav-logout{color:var(--danger);border-color:rgba(220,38,38,.15);}
+        .hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:8px;border:none;background:none;}
+        .hamburger span{width:22px;height:2px;background:var(--brand);border-radius:2px;transition:all .3s;}
+        .hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+        .hamburger.open span:nth-child(2){opacity:0}
+        .hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+        .mobile-menu{display:none;position:fixed;top:64px;left:0;right:0;z-index:199;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:12px 16px;flex-direction:column;gap:4px;box-shadow:0 8px 24px rgba(14,165,233,.1);}
+        .mobile-menu.open{display:flex;}
+        .mobile-menu a{color:var(--muted);text-decoration:none;font-family:'Exo 2',sans-serif;font-size:14px;font-weight:600;padding:11px 14px;border-radius:10px;border:1px solid transparent;transition:all .2s;}
+        .mobile-menu a:hover,.mobile-menu a.active{background:rgba(14,165,233,.07);border-color:var(--border);color:var(--brand);}
+        .mobile-menu a.nav-logout{color:var(--danger);}
 
         /* PAGE */
-        .page{position:relative;z-index:1;max-width:1160px;margin:0 auto;padding:28px 18px 120px;}
-        .sec-title{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:#0369a1;letter-spacing:2px;text-transform:uppercase;
-            margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid rgba(14,165,233,0.2);display:flex;align-items:center;gap:10px;}
-        .sec-title::before{content:'';width:3px;height:18px;background:linear-gradient(180deg,#0369a1,#0891b2);border-radius:2px;display:inline-block;}
-        .divider{border:none;border-top:1px solid rgba(14,165,233,0.18);margin:28px 0;}
+        .page{position:relative;z-index:1;max-width:1160px;margin:0 auto;padding:24px 16px 100px;}
+        .sec-title{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:var(--brand);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+        .sec-title::before{content:'';width:3px;height:16px;background:linear-gradient(180deg,var(--brand),var(--accent));border-radius:2px;flex-shrink:0;}
+        .divider{border:none;border-top:1px solid var(--border);margin:24px 0;}
 
         /* TABS */
-        .tab-bar{display:flex;gap:4px;margin-bottom:22px;background:rgba(255,255,255,0.6);border:1px solid rgba(14,165,233,0.18);border-radius:12px;padding:5px;}
-        .tab-btn{flex:1;padding:10px 16px;background:none;border:none;border-radius:8px;font-family:'Exo 2',sans-serif;font-size:13px;font-weight:600;color:#4a7fa5;cursor:pointer;transition:all 0.2s;letter-spacing:0.4px;}
-        .tab-btn.active{background:rgba(3,105,161,0.12);color:#0369a1;border:1px solid rgba(14,165,233,0.25);}
-        .tab-btn:hover:not(.active){background:rgba(14,165,233,0.07);color:#0369a1;}
+        .tab-bar{display:flex;gap:4px;margin-bottom:22px;background:rgba(255,255,255,.65);border:1px solid var(--border);border-radius:12px;padding:5px;}
+        .tab-btn{flex:1;padding:10px 16px;background:none;border:none;border-radius:8px;font-family:'Exo 2',sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .2s;letter-spacing:.3px;}
+        .tab-btn.active{background:rgba(3,105,161,.1);color:var(--brand);border:1px solid rgba(14,165,233,.22);}
+        .tab-btn:hover:not(.active){background:rgba(14,165,233,.06);color:var(--brand);}
         .tab-pane{display:none;}.tab-pane.active{display:block;}
 
         /* INPUT PANEL */
-        .input-panel{background:rgba(255,255,255,0.78);border:1px solid rgba(14,165,233,0.2);border-radius:18px;padding:26px;margin-bottom:22px;backdrop-filter:blur(10px);}
-        .input-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px;}
-        .input-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:18px;}
-        .form-group label{display:block;font-size:10px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
-        .form-group input,.form-group select{width:100%;padding:11px 14px;background:rgba(255,255,255,0.9);border:1px solid rgba(14,165,233,0.2);border-radius:10px;font-size:14px;color:#1e3a5f;font-family:'Exo 2',sans-serif;transition:border-color 0.2s;}
-        .form-group input:focus,.form-group select:focus{outline:none;border-color:#0369a1;box-shadow:0 0 0 3px rgba(14,165,233,0.12);}
-        .form-group select option{background:white;}
-        .run-btn{padding:12px 32px;border:none;border-radius:10px;background:linear-gradient(135deg,#0369a1,#0891b2);color:white;font-size:13px;font-weight:700;font-family:'Exo 2',sans-serif;cursor:pointer;letter-spacing:0.5px;border:1px solid rgba(14,165,233,0.35);transition:all 0.2s;}
-        .run-btn:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(14,165,233,0.3);}
-        .run-btn:disabled{opacity:0.35;cursor:not-allowed;transform:none;}
-        .run-btn.green{background:linear-gradient(135deg,#15803d,#16a34a);}
-        .spinner{display:none;width:20px;height:20px;border:2px solid rgba(14,165,233,0.2);border-top-color:#0369a1;border-radius:50%;animation:spin 0.7s linear infinite;}
+        .input-panel{background:var(--glass);border:1px solid var(--border);border-radius:18px;padding:24px;margin-bottom:22px;backdrop-filter:blur(10px);}
+        .input-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px;}
+        .input-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px;}
+        .form-group label{display:block;font-size:10px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px;}
+        .form-group input,.form-group select{width:100%;padding:11px 14px;background:rgba(255,255,255,.92);border:1px solid var(--border);border-radius:10px;font-size:14px;color:var(--text);font-family:'Exo 2',sans-serif;transition:border-color .2s;}
+        .form-group input:focus,.form-group select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(14,165,233,.12);}
+        .run-btn{padding:12px 28px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--accent));color:white;font-size:13px;font-weight:700;font-family:'Exo 2',sans-serif;cursor:pointer;border:1px solid rgba(14,165,233,.3);transition:all .2s;}
+        .run-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(14,165,233,.25);}
+        .run-btn:disabled{opacity:.35;cursor:not-allowed;transform:none;}
+        .spinner{display:none;width:20px;height:20px;border:2px solid rgba(14,165,233,.2);border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite;}
         @keyframes spin{to{transform:rotate(360deg)}}
 
         /* RISK BANNER */
-        .risk-banner{border-radius:14px;padding:18px 28px;margin-bottom:22px;text-align:center;font-family:'Orbitron',sans-serif;font-size:13px;letter-spacing:1.5px;font-weight:700;backdrop-filter:blur(10px);}
-        .risk-banner.high    {background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.25);color:#dc2626;animation:pulse-red 2s ease infinite;}
-        .risk-banner.moderate{background:rgba(217,119,6,0.08);border:1px solid rgba(217,119,6,0.2);color:#d97706;}
-        .risk-banner.low     {background:rgba(22,163,74,0.08);border:1px solid rgba(22,163,74,0.2);color:#16a34a;}
-        @keyframes pulse-red{0%,100%{box-shadow:0 4px 16px rgba(220,38,38,0.1)}50%{box-shadow:0 4px 28px rgba(220,38,38,0.22)}}
+        .risk-banner{border-radius:14px;padding:16px 24px;margin-bottom:20px;text-align:center;font-family:'Orbitron',sans-serif;font-size:12px;letter-spacing:1.2px;font-weight:700;backdrop-filter:blur(10px);}
+        .risk-banner.high    {background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.2);color:var(--danger);animation:pulse-red 2s ease infinite;}
+        .risk-banner.moderate{background:rgba(217,119,6,.07);border:1px solid rgba(217,119,6,.2);color:var(--warn);}
+        .risk-banner.low     {background:rgba(22,163,74,.07);border:1px solid rgba(22,163,74,.2);color:var(--safe);}
+        @keyframes pulse-red{0%,100%{box-shadow:0 4px 16px rgba(220,38,38,.08)}50%{box-shadow:0 4px 28px rgba(220,38,38,.2)}}
 
         /* METRICS */
-        .metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
-        .metrics-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;}
-        .metric-card{background:rgba(255,255,255,0.78);border:1px solid rgba(14,165,233,0.2);border-radius:14px;padding:18px 16px;text-align:center;backdrop-filter:blur(10px);transition:border-color 0.2s,box-shadow 0.2s;}
-        .metric-card:hover{border-color:rgba(14,165,233,0.4);box-shadow:0 4px 16px rgba(14,165,233,0.12);}
-        .metric-val{font-family:'Orbitron',sans-serif;font-size:1.7rem;font-weight:900;color:#0369a1;margin-bottom:6px;}
-        .metric-val.danger{color:#dc2626;} .metric-val.warn{color:#d97706;} .metric-val.good{color:#16a34a;}
-        .metric-label{font-size:10px;color:#4a7fa5;font-weight:700;text-transform:uppercase;letter-spacing:1px;}
-        .metric-sub{font-size:11px;color:#6b9ab8;margin-top:4px;}
+        .metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+        .metric-card{background:var(--glass);border:1px solid var(--border);border-radius:14px;padding:18px 16px;text-align:center;backdrop-filter:blur(10px);transition:border-color .2s,transform .2s;}
+        .metric-card:hover{border-color:rgba(14,165,233,.4);transform:translateY(-2px);}
+        .metric-val{font-family:'Orbitron',sans-serif;font-size:1.6rem;font-weight:900;color:var(--brand);margin-bottom:5px;}
+        .metric-val.danger{color:var(--danger);}.metric-val.warn{color:var(--warn);}.metric-val.good{color:var(--safe);}
+        .metric-label{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:1px;}
+        .metric-sub{font-size:11px;color:#6b9ab8;margin-top:3px;}
 
         /* DETAIL CARDS */
-        .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px;}
-        .detail-card{background:rgba(255,255,255,0.78);border:1px solid rgba(14,165,233,0.2);border-radius:16px;padding:20px 22px;backdrop-filter:blur(10px);}
-        .detail-title{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;color:#0369a1;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(14,165,233,0.15);}
-        .detail-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid rgba(14,165,233,0.08);}
+        .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+        .detail-card{background:var(--glass);border:1px solid var(--border);border-radius:16px;padding:20px 22px;backdrop-filter:blur(10px);}
+        .detail-title{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;color:var(--brand);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(14,165,233,.1);}
+        .detail-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid rgba(14,165,233,.07);}
         .detail-row:first-of-type{border-top:none;}
-        .detail-key{font-size:12px;color:#4a7fa5;}
-        .detail-val{font-size:12px;font-weight:700;color:#1e3a5f;font-family:'Orbitron',sans-serif;}
+        .detail-key{font-size:12px;color:var(--muted);}
+        .detail-val{font-size:12px;font-weight:700;color:var(--text);font-family:'Orbitron',sans-serif;}
 
-        /* PROGRESS BARS */
+        /* BARS */
         .bar-wrap{margin:10px 0;}
         .bar-label{font-size:10px;color:#6b9ab8;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-weight:700;display:flex;justify-content:space-between;}
-        .bar-track{background:rgba(14,165,233,0.1);border-radius:8px;height:12px;overflow:hidden;border:1px solid rgba(14,165,233,0.15);}
+        .bar-track{background:rgba(14,165,233,.09);border-radius:8px;height:12px;overflow:hidden;border:1px solid rgba(14,165,233,.12);}
         .bar-fill{height:100%;border-radius:8px;transition:width 1s ease;}
-        .bar-fill.blue{background:linear-gradient(90deg,#0891b2,#0369a1);}
-        .bar-fill.red {background:linear-gradient(90deg,#f87171,#dc2626);}
-        .bar-fill.amber{background:linear-gradient(90deg,#fbbf24,#d97706);}
-        .bar-fill.green{background:linear-gradient(90deg,#4ade80,#16a34a);}
+        .bar-fill.blue{background:linear-gradient(90deg,var(--accent),var(--brand));}
+        .bar-fill.red{background:linear-gradient(90deg,#f87171,var(--danger));}
+        .bar-fill.amber{background:linear-gradient(90deg,#fbbf24,var(--warn));}
 
         /* SEVERITY BADGE */
-        .severity-badge{display:inline-block;padding:6px 16px;border-radius:8px;font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;}
-        .sev-0{background:rgba(22,163,74,0.1);color:#16a34a;border:1px solid rgba(22,163,74,0.25);}
-        .sev-1{background:rgba(22,163,74,0.1);color:#16a34a;border:1px solid rgba(22,163,74,0.25);}
-        .sev-2{background:rgba(217,119,6,0.1);color:#d97706;border:1px solid rgba(217,119,6,0.25);}
-        .sev-3{background:rgba(220,38,38,0.1);color:#dc2626;border:1px solid rgba(220,38,38,0.25);}
-        .sev-4{background:rgba(220,38,38,0.18);color:#991b1b;border:1px solid rgba(220,38,38,0.4);animation:pulse-red 2s ease infinite;}
+        .severity-badge{display:inline-block;padding:5px 14px;border-radius:8px;font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:.8px;}
+        .sev-0{background:rgba(22,163,74,.09);color:var(--safe);border:1px solid rgba(22,163,74,.2);}
+        .sev-1{background:rgba(22,163,74,.09);color:var(--safe);border:1px solid rgba(22,163,74,.2);}
+        .sev-2{background:rgba(217,119,6,.09);color:var(--warn);border:1px solid rgba(217,119,6,.2);}
+        .sev-3{background:rgba(220,38,38,.09);color:var(--danger);border:1px solid rgba(220,38,38,.2);}
+        .sev-4{background:rgba(220,38,38,.15);color:#991b1b;border:1px solid rgba(220,38,38,.35);animation:pulse-red 2s ease infinite;}
 
         /* CHART */
-        .chart-card{background:rgba(255,255,255,0.78);border:1px solid rgba(14,165,233,0.2);border-radius:16px;padding:20px 22px;backdrop-filter:blur(10px);margin-bottom:22px;}
+        .chart-card{background:var(--glass);border:1px solid var(--border);border-radius:16px;padding:20px 22px;backdrop-filter:blur(10px);margin-bottom:20px;}
         .chart-wrap{position:relative;height:260px;}
 
-        /* BATCH TABLE */
-        .table-card{background:rgba(255,255,255,0.78);border:1px solid rgba(14,165,233,0.2);border-radius:16px;padding:20px;backdrop-filter:blur(10px);overflow-x:auto;}
+        /* TABLES */
+        .table-card{background:var(--glass);border:1px solid var(--border);border-radius:16px;padding:20px;backdrop-filter:blur(10px);overflow-x:auto;}
         table{width:100%;border-collapse:collapse;font-size:13px;}
-        thead tr{background:rgba(200,230,255,0.4);}
-        th{padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:1px;font-family:'Orbitron',sans-serif;border-bottom:1px solid rgba(14,165,233,0.18);}
-        td{padding:10px 14px;border-bottom:1px solid rgba(14,165,233,0.08);color:#2c5282;}
+        thead tr{background:rgba(200,230,255,.35);}
+        th{padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:1px;font-family:'Orbitron',sans-serif;border-bottom:1px solid var(--border);}
+        td{padding:10px 14px;border-bottom:1px solid rgba(14,165,233,.07);color:#2c5282;}
         tbody tr:last-child td{border-bottom:none;}
-        tbody tr:hover td{background:rgba(14,165,233,0.05);color:#1e3a5f;}
+        tbody tr:hover td{background:rgba(14,165,233,.05);color:var(--text);}
         .sev-cell{padding:3px 10px;border-radius:6px;font-size:10px;font-weight:700;font-family:'Orbitron',sans-serif;}
 
         /* RECO */
-        .reco-card{background:rgba(255,184,0,0.07);border:1px solid rgba(255,184,0,0.25);border-radius:14px;padding:20px 22px;border-left:3px solid #d97706;}
-        .reco-title{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:#d97706;letter-spacing:1px;margin-bottom:12px;}
+        .reco-card{background:rgba(255,184,0,.06);border:1px solid rgba(255,184,0,.22);border-radius:14px;padding:20px 22px;border-left:3px solid var(--warn);}
+        .reco-title{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:var(--warn);letter-spacing:1px;margin-bottom:12px;}
         .reco-list{list-style:none;padding:0;}
-        .reco-list li{display:flex;gap:10px;padding:6px 0;border-top:1px solid rgba(255,184,0,0.08);color:#2c5282;font-size:13px;}
+        .reco-list li{display:flex;gap:10px;padding:6px 0;border-top:1px solid rgba(255,184,0,.07);color:#2c5282;font-size:13px;}
         .reco-list li:first-child{border-top:none;}
-        .reco-list li::before{content:"›";color:#d97706;font-weight:700;font-size:16px;line-height:1.2;flex-shrink:0;}
+        .reco-list li::before{content:"›";color:var(--warn);font-weight:700;font-size:16px;line-height:1.2;flex-shrink:0;}
 
-        footer{text-align:center;font-size:11px;color:#4a7fa5;padding:20px 0 0;position:relative;z-index:1;font-family:'Orbitron',sans-serif;letter-spacing:1px;}
-        @media(max-width:640px){
-            .input-grid,.metrics-grid{grid-template-columns:1fr 1fr;}
-            .input-grid-3,.metrics-grid-3,.detail-grid{grid-template-columns:1fr;}
+        footer{text-align:center;font-size:11px;color:#6b9ab8;padding:20px 0 0;position:relative;z-index:1;font-family:'Orbitron',sans-serif;letter-spacing:1px;}
+
+        @media(max-width:768px){
+            .topbar nav{display:none;} .hamburger{display:flex;}
+            .input-grid{grid-template-columns:1fr 1fr;}
+            .metrics-grid{grid-template-columns:1fr 1fr;}
+        }
+        @media(max-width:480px){
+            .input-grid,.input-grid-3{grid-template-columns:1fr;}
+            .metrics-grid{grid-template-columns:1fr 1fr;}
+            .detail-grid{grid-template-columns:1fr;}
+            .tab-btn{font-size:11px;padding:8px 6px;}
         }
     </style>
 </head>
 <body>
-<div class="wave-container">
-    <div class="wave wave1"></div><div class="wave wave2"></div><div class="wave wave3"></div>
-</div>
+<div class="wave-container"><div class="wave wave1"></div><div class="wave wave2"></div><div class="wave wave3"></div></div>
 
-<!-- TOPBAR -->
 <div class="topbar">
     <div class="topbar-left">
-        <h1>⛈ Flood Prediction System</h1>
+        <h1>⛈ FloodWatch India</h1>
         <span class="live-pill">HYDROLOGY</span>
     </div>
     <nav>
@@ -173,536 +157,248 @@
         <a href="/hydrology" class="active">Hydrology</a>
         <a href="/logout" class="nav-logout">Logout</a>
     </nav>
+    <button class="hamburger" id="hamburger" onclick="toggleMenu()" aria-label="Menu">
+        <span></span><span></span><span></span>
+    </button>
+</div>
+<div class="mobile-menu" id="mobile-menu">
+    <a href="/">Home</a>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/alerts">Alerts</a>
+    <a href="/hydrology" class="active">Hydrology</a>
+    <a href="/logout" class="nav-logout">Logout</a>
 </div>
 
 <div class="page">
 
-<!-- ══ TABS ══ -->
 <div class="tab-bar">
-    <button class="tab-btn active" onclick="switchTab('simulate')">⚙ Run Simulation</button>
-    <button class="tab-btn" onclick="switchTab('batch')"> Batch Scenarios</button>
-    <button class="tab-btn" onclick="switchTab('scs')"> SCS Curve Numbers</button>
+    <button class="tab-btn active" onclick="switchTab('simulate',event)">⚙ Run Simulation</button>
+    <button class="tab-btn" onclick="switchTab('batch',event)">📊 Batch Scenarios</button>
+    <button class="tab-btn" onclick="switchTab('scs',event)">📋 SCS Curve Numbers</button>
 </div>
 
-<!-- ══════════ TAB 1: SIMULATE ══════════ -->
+<!-- TAB 1: SIMULATE -->
 <div class="tab-pane active" id="pane-simulate">
-
     <div class="sec-title">Hydrological Model Simulator</div>
-
     <div class="input-panel">
         <div class="input-grid">
-            <div class="form-group">
-                <label>Location</label>
-                <select id="h-location">
-                    <option value="Chennai, Tamil Nadu">Chennai, Tamil Nadu</option>
-                    <option value="Kolkata, West Bengal">Kolkata, West Bengal</option>
-                    <option value="Guwahati, Assam">Guwahati, Assam</option>
-                    <option value="Kochi, Kerala">Kochi, Kerala</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Rainfall (mm/hr)</label>
-                <input type="number" id="h-rainfall" value="85" min="0" max="300" step="1">
-            </div>
-            <div class="form-group">
-                <label>Water Level (m)</label>
-                <input type="number" id="h-water" value="4.5" min="0" max="15" step="0.1">
-            </div>
-            <div class="form-group">
-                <label>Curve Number (CN)</label>
-                <input type="number" id="h-cn" value="75" min="30" max="100" step="1" title="SCS Curve Number: higher = more runoff">
-            </div>
+            <div class="form-group"><label>Location</label><select id="h-location"><option value="Chennai, Tamil Nadu">Chennai, Tamil Nadu</option><option value="Kolkata, West Bengal">Kolkata, West Bengal</option><option value="Guwahati, Assam">Guwahati, Assam</option><option value="Kochi, Kerala">Kochi, Kerala</option></select></div>
+            <div class="form-group"><label>Rainfall (mm/hr)</label><input type="number" id="h-rainfall" value="85" min="0" max="300" step="1"></div>
+            <div class="form-group"><label>Water Level (m)</label><input type="number" id="h-water" value="4.5" min="0" max="15" step="0.1"></div>
+            <div class="form-group"><label>Curve Number (CN)</label><input type="number" id="h-cn" value="75" min="30" max="100" step="1"></div>
         </div>
-        <div class="input-grid-3" style="margin-bottom:18px;">
-            <div class="form-group">
-                <label>Antecedent Moisture (AMC)</label>
-                <select id="h-amc">
-                    <option value="I">AMC-I — Dry (previous 5-day rainfall &lt;35mm)</option>
-                    <option value="II" selected>AMC-II — Normal (35–50mm)</option>
-                    <option value="III">AMC-III — Wet (&gt;50mm)</option>
-                </select>
-            </div>
+        <div class="input-grid-3">
+            <div class="form-group"><label>Antecedent Moisture (AMC)</label><select id="h-amc"><option value="I">AMC-I — Dry (&lt;35mm)</option><option value="II" selected>AMC-II — Normal (35–50mm)</option><option value="III">AMC-III — Wet (&gt;50mm)</option></select></div>
             <div class="form-group" style="display:flex;flex-direction:column;justify-content:flex-end;">
-                <label>&nbsp;</label>
-                <div style="display:flex;align-items:center;gap:12px;">
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
                     <button class="run-btn" id="run-btn" onclick="runHydrology()">▶ Run Hydrology Model</button>
                     <div class="spinner" id="h-spinner"></div>
-                    <span id="h-error" style="color:#dc2626;font-size:13px;display:none;"></span>
+                    <span id="h-error" style="color:var(--danger);font-size:13px;display:none;"></span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- RESULTS -->
     <div id="results-section" style="display:none;">
-
-        <div class="risk-banner" id="risk-banner">-- RUN MODEL --</div>
-
-        <!-- 8 KEY METRICS -->
+        <div class="risk-banner" id="risk-banner">— RUN MODEL —</div>
         <div class="metrics-grid">
-            <div class="metric-card">
-                <div class="metric-val" id="h-ml-prob">--%</div>
-                <div class="metric-label">ML Flood Probability</div>
-                <div class="metric-sub">Logistic Regression</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-val" id="h-flooded-area">--%</div>
-                <div class="metric-label">Flooded Area</div>
-                <div class="metric-sub">Estimated coverage</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-val" id="h-max-depth">-- m</div>
-                <div class="metric-label">Max Flood Depth</div>
-                <div class="metric-sub">Peak inundation (HAND)</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-val" id="h-runoff">-- mm</div>
-                <div class="metric-label">SCS Runoff</div>
-                <div class="metric-sub">Curve Number method</div>
-            </div>
+            <div class="metric-card"><div class="metric-val" id="h-ml-prob">--%</div><div class="metric-label">ML Flood Probability</div><div class="metric-sub">Logistic Regression</div></div>
+            <div class="metric-card"><div class="metric-val" id="h-flooded-area">--%</div><div class="metric-label">Flooded Area</div><div class="metric-sub">Estimated coverage</div></div>
+            <div class="metric-card"><div class="metric-val" id="h-max-depth">-- m</div><div class="metric-label">Max Flood Depth</div><div class="metric-sub">Peak inundation (HAND)</div></div>
+            <div class="metric-card"><div class="metric-val" id="h-runoff">-- mm</div><div class="metric-label">SCS Runoff</div><div class="metric-sub">Curve Number method</div></div>
         </div>
         <div class="metrics-grid">
-            <div class="metric-card">
-                <div class="metric-val" id="h-wl-rise">-- m</div>
-                <div class="metric-label">Water Level Rise</div>
-                <div class="metric-sub">Stream rise estimate</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-val" id="h-avg-depth">-- m</div>
-                <div class="metric-label">Avg Flood Depth</div>
-                <div class="metric-sub">Mean inundation</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-val" id="h-infiltration">-- mm</div>
-                <div class="metric-label">Infiltration</div>
-                <div class="metric-sub">Absorbed by soil</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-val" id="h-runoff-coeff">--</div>
-                <div class="metric-label">Runoff Coefficient</div>
-                <div class="metric-sub">Runoff / Rainfall</div>
-            </div>
+            <div class="metric-card"><div class="metric-val" id="h-wl-rise">-- m</div><div class="metric-label">Water Level Rise</div><div class="metric-sub">Stream rise estimate</div></div>
+            <div class="metric-card"><div class="metric-val" id="h-avg-depth">-- m</div><div class="metric-label">Avg Flood Depth</div><div class="metric-sub">Mean inundation</div></div>
+            <div class="metric-card"><div class="metric-val" id="h-infiltration">-- mm</div><div class="metric-label">Infiltration</div><div class="metric-sub">Absorbed by soil</div></div>
+            <div class="metric-card"><div class="metric-val" id="h-runoff-coeff">--</div><div class="metric-label">Runoff Coefficient</div><div class="metric-sub">Runoff / Rainfall</div></div>
         </div>
-
-        <!-- FLOOD DEPTH + SEVERITY -->
         <div class="chart-card">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
                 <div class="sec-title" style="margin:0;border:none;padding:0;">Flood Inundation Analysis</div>
-                <span id="severity-badge" class="severity-badge sev-0">-- No Flood --</span>
+                <span id="severity-badge" class="severity-badge sev-0">— No Flood —</span>
             </div>
-            <div class="bar-wrap">
-                <div class="bar-label"><span>Flooded Area Coverage</span><span id="flooded-pct-label">0%</span></div>
-                <div class="bar-track"><div class="bar-fill blue" id="flooded-bar" style="width:0%"></div></div>
-            </div>
-            <div class="bar-wrap" style="margin-top:14px;">
-                <div class="bar-label"><span>Runoff vs Rainfall</span><span id="runoff-pct-label">0%</span></div>
-                <div class="bar-track"><div class="bar-fill amber" id="runoff-bar" style="width:0%"></div></div>
-            </div>
-            <div class="bar-wrap" style="margin-top:14px;">
-                <div class="bar-label"><span>Max Depth (relative to 5m scale)</span><span id="depth-pct-label">0 m</span></div>
-                <div class="bar-track"><div class="bar-fill red" id="depth-bar" style="width:0%"></div></div>
-            </div>
+            <div class="bar-wrap"><div class="bar-label"><span>Flooded Area Coverage</span><span id="flooded-pct-label">0%</span></div><div class="bar-track"><div class="bar-fill blue" id="flooded-bar" style="width:0%"></div></div></div>
+            <div class="bar-wrap" style="margin-top:12px;"><div class="bar-label"><span>Runoff vs Rainfall</span><span id="runoff-pct-label">0%</span></div><div class="bar-track"><div class="bar-fill amber" id="runoff-bar" style="width:0%"></div></div></div>
+            <div class="bar-wrap" style="margin-top:12px;"><div class="bar-label"><span>Max Depth (relative to 5m scale)</span><span id="depth-pct-label">0 m</span></div><div class="bar-track"><div class="bar-fill red" id="depth-bar" style="width:0%"></div></div></div>
         </div>
-
-        <!-- DETAIL PANELS -->
         <div class="detail-grid">
             <div class="detail-card">
                 <div class="detail-title">ML + Combined Model Output</div>
-                <div class="detail-row"><span class="detail-key">ML Risk Level</span>      <span class="detail-val" id="d-ml-risk">--</span></div>
-                <div class="detail-row"><span class="detail-key">ML Probability</span>     <span class="detail-val" id="d-ml-prob">--</span></div>
-                <div class="detail-row"><span class="detail-key">Combined Risk</span>      <span class="detail-val" id="d-combined">--</span></div>
-                <div class="detail-row"><span class="detail-key">Severity Class</span>     <span class="detail-val" id="d-severity">--</span></div>
-                <div class="detail-row"><span class="detail-key">Severity Label</span>     <span class="detail-val" id="d-sev-label" style="font-size:10px;">--</span></div>
-                <div class="detail-row"><span class="detail-key">Model</span>              <span class="detail-val">ML + SCS Hydrology</span></div>
+                <div class="detail-row"><span class="detail-key">ML Risk Level</span><span class="detail-val" id="d-ml-risk">--</span></div>
+                <div class="detail-row"><span class="detail-key">ML Probability</span><span class="detail-val" id="d-ml-prob">--</span></div>
+                <div class="detail-row"><span class="detail-key">Combined Risk</span><span class="detail-val" id="d-combined">--</span></div>
+                <div class="detail-row"><span class="detail-key">Severity Class</span><span class="detail-val" id="d-severity">--</span></div>
+                <div class="detail-row"><span class="detail-key">Severity Label</span><span class="detail-val" id="d-sev-label" style="font-size:10px;">--</span></div>
+                <div class="detail-row"><span class="detail-key">Model</span><span class="detail-val">ML + SCS Hydrology</span></div>
             </div>
             <div class="detail-card">
                 <div class="detail-title">SCS Rainfall-Runoff Output</div>
-                <div class="detail-row"><span class="detail-key">Curve Number</span>               <span class="detail-val" id="d-cn">--</span></div>
-                <div class="detail-row"><span class="detail-key">AMC Condition</span>              <span class="detail-val" id="d-amc">--</span></div>
-                <div class="detail-row"><span class="detail-key">Runoff (mm)</span>                <span class="detail-val" id="d-runoff">--</span></div>
-                <div class="detail-row"><span class="detail-key">Infiltration (mm)</span>          <span class="detail-val" id="d-infiltration">--</span></div>
-                <div class="detail-row"><span class="detail-key">Runoff Coefficient</span>         <span class="detail-val" id="d-runoff-coeff">--</span></div>
-                <div class="detail-row"><span class="detail-key">Water Level Rise (m)</span>       <span class="detail-val" id="d-wl-rise">--</span></div>
-                <div class="detail-row"><span class="detail-key">Flooded Area (%)</span>           <span class="detail-val" id="d-flooded">--</span></div>
-                <div class="detail-row"><span class="detail-key">Max Depth (m)</span>              <span class="detail-val" id="d-maxdepth">--</span></div>
-                <div class="detail-row"><span class="detail-key">Avg Depth (m)</span>              <span class="detail-val" id="d-avgdepth">--</span></div>
+                <div class="detail-row"><span class="detail-key">Curve Number</span><span class="detail-val" id="d-cn">--</span></div>
+                <div class="detail-row"><span class="detail-key">AMC Condition</span><span class="detail-val" id="d-amc">--</span></div>
+                <div class="detail-row"><span class="detail-key">Runoff (mm)</span><span class="detail-val" id="d-runoff">--</span></div>
+                <div class="detail-row"><span class="detail-key">Infiltration (mm)</span><span class="detail-val" id="d-infiltration">--</span></div>
+                <div class="detail-row"><span class="detail-key">Runoff Coefficient</span><span class="detail-val" id="d-runoff-coeff">--</span></div>
+                <div class="detail-row"><span class="detail-key">Water Level Rise (m)</span><span class="detail-val" id="d-wl-rise">--</span></div>
+                <div class="detail-row"><span class="detail-key">Flooded Area (%)</span><span class="detail-val" id="d-flooded">--</span></div>
+                <div class="detail-row"><span class="detail-key">Max Depth (m)</span><span class="detail-val" id="d-maxdepth">--</span></div>
+                <div class="detail-row"><span class="detail-key">Avg Depth (m)</span><span class="detail-val" id="d-avgdepth">--</span></div>
             </div>
         </div>
-
-        <!-- SCENARIO CHART -->
         <div class="chart-card">
             <div class="sec-title" style="margin-bottom:14px;border:none;padding:0;">Flood Scenario — Rainfall vs Impact (CN=<span id="chart-cn-label">75</span>)</div>
             <div class="chart-wrap"><canvas id="hydro-chart"></canvas></div>
         </div>
-
-        <!-- RECOMMENDATIONS -->
         <div class="reco-card" id="reco-card" style="display:none;">
             <div class="reco-title">⚠ Recommended Actions</div>
             <ul class="reco-list" id="reco-list"></ul>
         </div>
+    </div>
+</div>
 
-    </div><!-- results-section -->
-</div><!-- pane-simulate -->
-
-<!-- ══════════ TAB 2: BATCH ══════════ -->
+<!-- TAB 2: BATCH -->
 <div class="tab-pane" id="pane-batch">
     <div class="sec-title">Batch Scenario Analysis</div>
     <div class="input-panel">
         <div class="input-grid-3">
-            <div class="form-group">
-                <label>Location</label>
-                <select id="b-location">
-                    <option value="Chennai, Tamil Nadu">Chennai, Tamil Nadu</option>
-                    <option value="Kolkata, West Bengal">Kolkata, West Bengal</option>
-                    <option value="Guwahati, Assam">Guwahati, Assam</option>
-                    <option value="Kochi, Kerala">Kochi, Kerala</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>SCS Curve Number</label>
-                <input type="number" id="b-cn" value="75" min="30" max="100" step="1">
-            </div>
-            <div class="form-group">
-                <label>AMC Condition</label>
-                <select id="b-amc">
-                    <option value="I">AMC-I — Dry</option>
-                    <option value="II" selected>AMC-II — Normal</option>
-                    <option value="III">AMC-III — Wet</option>
-                </select>
-            </div>
+            <div class="form-group"><label>Location</label><select id="b-location"><option value="Chennai, Tamil Nadu">Chennai, Tamil Nadu</option><option value="Kolkata, West Bengal">Kolkata, West Bengal</option><option value="Guwahati, Assam">Guwahati, Assam</option><option value="Kochi, Kerala">Kochi, Kerala</option></select></div>
+            <div class="form-group"><label>SCS Curve Number</label><input type="number" id="b-cn" value="75" min="30" max="100" step="1"></div>
+            <div class="form-group"><label>AMC Condition</label><select id="b-amc"><option value="I">AMC-I — Dry</option><option value="II" selected>AMC-II — Normal</option><option value="III">AMC-III — Wet</option></select></div>
         </div>
         <div style="display:flex;align-items:center;gap:12px;">
-            <button class="run-btn" id="batch-btn" onclick="runBatch()"> Run All Scenarios</button>
+            <button class="run-btn" id="batch-btn" onclick="runBatch()">▶ Run All Scenarios</button>
             <div class="spinner" id="b-spinner"></div>
         </div>
     </div>
-
     <div id="batch-results" style="display:none;">
-        <div class="chart-card" style="margin-bottom:22px;">
-            <div class="sec-title" style="margin-bottom:14px;border:none;padding:0;">Batch Results — Rainfall vs Flooded Area & Runoff</div>
-            <div class="chart-wrap"><canvas id="batch-chart"></canvas></div>
-        </div>
+        <div class="chart-card" style="margin-bottom:20px;"><div class="sec-title" style="margin-bottom:14px;border:none;padding:0;">Batch Results — Rainfall vs Flooded Area &amp; Runoff</div><div class="chart-wrap"><canvas id="batch-chart"></canvas></div></div>
         <div class="table-card">
-            <div style="font-family:'Orbitron',sans-serif;font-size:11px;color:#0369a1;font-weight:700;letter-spacing:1.5px;margin-bottom:14px;">SCENARIO RESULTS TABLE</div>
-            <table>
-                <thead><tr>
-                    <th>Rainfall (mm)</th><th>Runoff (mm)</th><th>Infiltration (mm)</th>
-                    <th>Runoff Coeff</th><th>WL Rise (m)</th><th>Flooded (%)</th>
-                    <th>Max Depth (m)</th><th>Severity</th>
-                </tr></thead>
-                <tbody id="batch-tbody"></tbody>
-            </table>
+            <div style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--brand);font-weight:700;letter-spacing:1.5px;margin-bottom:14px;">SCENARIO RESULTS TABLE</div>
+            <table><thead><tr><th>Rainfall (mm)</th><th>Runoff (mm)</th><th>Infiltration (mm)</th><th>Runoff Coeff</th><th>WL Rise (m)</th><th>Flooded (%)</th><th>Max Depth (m)</th><th>Severity</th></tr></thead><tbody id="batch-tbody"></tbody></table>
         </div>
     </div>
 </div>
 
-<!-- ══════════ TAB 3: SCS CN ══════════ -->
+<!-- TAB 3: SCS CN -->
 <div class="tab-pane" id="pane-scs">
     <div class="sec-title">SCS Curve Number Reference Table</div>
-    <div class="input-panel" style="margin-bottom:22px;">
-        <p style="font-size:13px;color:#4a7fa5;line-height:1.7;margin-bottom:12px;">
-            The <strong style="color:#0369a1;">SCS Curve Number</strong> method (USDA TR-55) converts rainfall to direct runoff based on land use and soil type. Higher CN = more runoff, less infiltration.
-        </p>
+    <div class="input-panel" style="margin-bottom:20px;">
+        <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:12px;">The <strong style="color:var(--brand);">SCS Curve Number</strong> method (USDA TR-55) converts rainfall to direct runoff based on land use and soil type. Higher CN = more runoff, less infiltration.</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;color:#2c5282;">
-            <div style="background:rgba(200,230,255,0.3);border-radius:8px;padding:12px;">
-                <div style="font-weight:700;color:#0369a1;margin-bottom:8px;">Hydrologic Soil Groups</div>
-                <div><strong>A</strong> — Sandy soils, high infiltration (low runoff)</div>
-                <div style="margin-top:4px;"><strong>B</strong> — Loamy soils, moderate infiltration</div>
-                <div style="margin-top:4px;"><strong>C</strong> — Clay-loam soils, slow infiltration</div>
-                <div style="margin-top:4px;"><strong>D</strong> — Clay soils, very slow infiltration (high runoff)</div>
-            </div>
-            <div style="background:rgba(200,230,255,0.3);border-radius:8px;padding:12px;">
-                <div style="font-weight:700;color:#0369a1;margin-bottom:8px;">SCS Formula</div>
-                <div style="font-family:monospace;font-size:11px;color:#1e3a5f;line-height:1.8;">
-                    S = (25400/CN) − 254<br>
-                    Ia = 0.2 × S<br>
-                    Q = (P − Ia)² / (P − Ia + S)<br>
-                    <span style="color:#4a7fa5;">where P=rainfall, Q=runoff, S=max retention</span>
-                </div>
-            </div>
+            <div style="background:rgba(200,230,255,.25);border-radius:8px;padding:12px;"><div style="font-weight:700;color:var(--brand);margin-bottom:8px;">Hydrologic Soil Groups</div><div><strong>A</strong> — Sandy soils, high infiltration (low runoff)</div><div style="margin-top:4px;"><strong>B</strong> — Loamy soils, moderate infiltration</div><div style="margin-top:4px;"><strong>C</strong> — Clay-loam soils, slow infiltration</div><div style="margin-top:4px;"><strong>D</strong> — Clay soils, very slow infiltration (high runoff)</div></div>
+            <div style="background:rgba(200,230,255,.25);border-radius:8px;padding:12px;"><div style="font-weight:700;color:var(--brand);margin-bottom:8px;">SCS Formula</div><div style="font-family:monospace;font-size:11px;color:var(--text);line-height:1.9;">S = (25400/CN) − 254<br>Ia = 0.2 × S<br>Q = (P − Ia)² / (P − Ia + S)<br><span style="color:var(--muted);">where P=rainfall, Q=runoff, S=max retention</span></div></div>
         </div>
     </div>
     <div class="table-card">
-        <div style="font-family:'Orbitron',sans-serif;font-size:11px;color:#0369a1;font-weight:700;letter-spacing:1.5px;margin-bottom:14px;">CURVE NUMBERS BY LAND USE & SOIL GROUP (USDA TR-55)</div>
-        <table>
-            <thead><tr><th>Land Use</th><th>Soil A</th><th>Soil B</th><th>Soil C</th><th>Soil D</th><th>Description</th></tr></thead>
-            <tbody>
-                <tr><td><strong>Forest</strong></td><td>36</td><td>60</td><td>73</td><td>79</td><td style="color:#4a7fa5;">Good stand, litter and brush cover</td></tr>
-                <tr><td><strong>Agriculture</strong></td><td>67</td><td>78</td><td>85</td><td>89</td><td style="color:#4a7fa5;">Row crops, straight rows, good condition</td></tr>
-                <tr><td><strong>Urban Residential</strong></td><td>77</td><td>85</td><td>90</td><td>92</td><td style="color:#4a7fa5;">~30% impervious cover</td></tr>
-                <tr><td><strong>Urban Commercial</strong></td><td>89</td><td>92</td><td>94</td><td>95</td><td style="color:#4a7fa5;">~85% impervious cover</td></tr>
-                <tr><td><strong>Barren / Rock</strong></td><td>77</td><td>86</td><td>91</td><td>94</td><td style="color:#4a7fa5;">Thin stand, heavily grazed</td></tr>
-                <tr><td><strong>Water Body</strong></td><td>100</td><td>100</td><td>100</td><td>100</td><td style="color:#4a7fa5;">Ponds, lakes, reservoirs</td></tr>
-                <tr style="background:rgba(14,165,233,0.05);"><td><strong>Typical Urban India</strong></td><td colspan="4" style="text-align:center;font-weight:700;color:#0369a1;">75–90</td><td style="color:#4a7fa5;">Mixed land use, poor drainage</td></tr>
-                <tr style="background:rgba(14,165,233,0.05);"><td><strong>Typical Rural India</strong></td><td colspan="4" style="text-align:center;font-weight:700;color:#0369a1;">60–78</td><td style="color:#4a7fa5;">Agriculture + forest mix</td></tr>
-            </tbody>
-        </table>
+        <div style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--brand);font-weight:700;letter-spacing:1.5px;margin-bottom:14px;">CURVE NUMBERS BY LAND USE &amp; SOIL GROUP (USDA TR-55)</div>
+        <table><thead><tr><th>Land Use</th><th>Soil A</th><th>Soil B</th><th>Soil C</th><th>Soil D</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Forest</strong></td><td>36</td><td>60</td><td>73</td><td>79</td><td style="color:var(--muted);">Good stand, litter and brush cover</td></tr>
+            <tr><td><strong>Agriculture</strong></td><td>67</td><td>78</td><td>85</td><td>89</td><td style="color:var(--muted);">Row crops, straight rows, good condition</td></tr>
+            <tr><td><strong>Urban Residential</strong></td><td>77</td><td>85</td><td>90</td><td>92</td><td style="color:var(--muted);">~30% impervious cover</td></tr>
+            <tr><td><strong>Urban Commercial</strong></td><td>89</td><td>92</td><td>94</td><td>95</td><td style="color:var(--muted);">~85% impervious cover</td></tr>
+            <tr><td><strong>Barren / Rock</strong></td><td>77</td><td>86</td><td>91</td><td>94</td><td style="color:var(--muted);">Thin stand, heavily grazed</td></tr>
+            <tr><td><strong>Water Body</strong></td><td>100</td><td>100</td><td>100</td><td>100</td><td style="color:var(--muted);">Ponds, lakes, reservoirs</td></tr>
+            <tr style="background:rgba(14,165,233,.04);"><td><strong>Typical Urban India</strong></td><td colspan="4" style="text-align:center;font-weight:700;color:var(--brand);">75–90</td><td style="color:var(--muted);">Mixed land use, poor drainage</td></tr>
+            <tr style="background:rgba(14,165,233,.04);"><td><strong>Typical Rural India</strong></td><td colspan="4" style="text-align:center;font-weight:700;color:var(--brand);">60–78</td><td style="color:var(--muted);">Agriculture + forest mix</td></tr>
+        </tbody></table>
     </div>
-
     <div class="divider"></div>
     <div class="sec-title">AMC Antecedent Moisture Conditions</div>
-    <div class="table-card">
-        <table>
-            <thead><tr><th>AMC Class</th><th>5-Day Antecedent Rainfall</th><th>Soil Condition</th><th>Effect on CN</th></tr></thead>
-            <tbody>
-                <tr><td><strong style="color:#16a34a;">AMC-I (Dry)</strong></td><td>&lt; 35 mm</td><td>Wilting point, minimal moisture</td><td>CN reduced (less runoff)</td></tr>
-                <tr><td><strong style="color:#0369a1;">AMC-II (Normal)</strong></td><td>35 – 50 mm</td><td>Field capacity, average condition</td><td>CN unchanged (standard)</td></tr>
-                <tr><td><strong style="color:#dc2626;">AMC-III (Wet)</strong></td><td>&gt; 50 mm</td><td>Saturation, very wet soil</td><td>CN increased (more runoff)</td></tr>
-            </tbody>
-        </table>
-    </div>
+    <div class="table-card"><table><thead><tr><th>AMC Class</th><th>5-Day Antecedent Rainfall</th><th>Soil Condition</th><th>Effect on CN</th></tr></thead>
+    <tbody>
+        <tr><td><strong style="color:var(--safe);">AMC-I (Dry)</strong></td><td>&lt; 35 mm</td><td>Wilting point, minimal moisture</td><td>CN reduced (less runoff)</td></tr>
+        <tr><td><strong style="color:var(--brand);">AMC-II (Normal)</strong></td><td>35 – 50 mm</td><td>Field capacity, average condition</td><td>CN unchanged (standard)</td></tr>
+        <tr><td><strong style="color:var(--danger);">AMC-III (Wet)</strong></td><td>&gt; 50 mm</td><td>Saturation, very wet soil</td><td>CN increased (more runoff)</td></tr>
+    </tbody></table></div>
 </div>
 
-</div><!-- .page -->
-<footer><p>&copy; 2024 Flood Prediction System | Powered by AI + SCS Hydrology</p></footer>
+</div>
+<footer><p>&copy; 2024 FloodWatch India | AI-Powered + SCS Hydrology</p></footer>
 
 <script>
-let hydroChart = null, batchChart = null;
+function toggleMenu(){const m=document.getElementById('mobile-menu'),b=document.getElementById('hamburger');m.classList.toggle('open');b.classList.toggle('open');}
+document.addEventListener('click',function(e){const m=document.getElementById('mobile-menu'),b=document.getElementById('hamburger');if(!m.contains(e.target)&&!b.contains(e.target)){m.classList.remove('open');b.classList.remove('open');}});
 
-/* ── TABS ── */
-function switchTab(name) {
-    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('pane-' + name).classList.add('active');
-    event.target.classList.add('active');
+let hydroChart=null,batchChart=null;
+
+function switchTab(name,event){
+    document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('pane-'+name).classList.add('active');
+    if(event&&event.target)event.target.classList.add('active');
 }
 
-/* ── RUN SIMULATION ── */
-function runHydrology() {
-    const location = document.getElementById('h-location').value;
-    const rainfall = parseFloat(document.getElementById('h-rainfall').value) || 0;
-    const water    = parseFloat(document.getElementById('h-water').value)    || 0;
-    const cn       = parseFloat(document.getElementById('h-cn').value)       || 75;
-    const amc      = document.getElementById('h-amc').value;
-    const btn      = document.getElementById('run-btn');
-    const spinner  = document.getElementById('h-spinner');
-    const errEl    = document.getElementById('h-error');
-
-    btn.disabled = true; spinner.style.display = 'block'; errEl.style.display = 'none';
-
+function runHydrology(){
+    const location=document.getElementById('h-location').value,rainfall=parseFloat(document.getElementById('h-rainfall').value)||0,water=parseFloat(document.getElementById('h-water').value)||0,cn=parseFloat(document.getElementById('h-cn').value)||75,amc=document.getElementById('h-amc').value;
+    const btn=document.getElementById('run-btn'),spinner=document.getElementById('h-spinner'),errEl=document.getElementById('h-error');
+    btn.disabled=true;spinner.style.display='block';errEl.style.display='none';
     fetch(`/api/hydrology?location=${encodeURIComponent(location)}&rainfall=${rainfall}&water_level=${water}&curve_number=${cn}&amc=${amc}`)
-        .then(r => r.json())
-        .then(d => {
-            btn.disabled = false; spinner.style.display = 'none';
-            if (d.error) { errEl.textContent = 'Error: ' + d.error; errEl.style.display = 'block'; return; }
-            renderResults(d, rainfall);
-        })
-        .catch(e => {
-            btn.disabled = false; spinner.style.display = 'none';
-            errEl.textContent = 'Network error: ' + e.message; errEl.style.display = 'block';
-        });
+        .then(r=>r.json()).then(d=>{btn.disabled=false;spinner.style.display='none';if(d.error){errEl.textContent='Error: '+d.error;errEl.style.display='block';return;}renderResults(d,rainfall);})
+        .catch(e=>{btn.disabled=false;spinner.style.display='none';errEl.textContent='Network error: '+e.message;errEl.style.display='block';});
 }
 
-function sevClass(level) {
-    const map = {0:'sev-0',1:'sev-1',2:'sev-2',3:'sev-3',4:'sev-4'};
-    return map[level] || 'sev-0';
+function sevClass(level){return{0:'sev-0',1:'sev-1',2:'sev-2',3:'sev-3',4:'sev-4'}[level]||'sev-0';}
+
+function renderResults(d,rainfall){
+    document.getElementById('results-section').style.display='block';
+    const risk=(d.combined_risk||'Low').toLowerCase();
+    const banner=document.getElementById('risk-banner');
+    const rk=risk==='high'||risk==='very high'?'high':risk==='medium'||risk==='moderate'?'moderate':'low';
+    banner.className='risk-banner '+rk;
+    banner.textContent=(rk==='high'?'⚠ HIGH FLOOD RISK — IMMEDIATE ACTION':rk==='moderate'?'⚡ MODERATE RISK — STAY ALERT':'✓ LOW RISK — CONDITIONS STABLE')+' | '+d.location;
+    const mlProb=d.ml_probability||0,floodedArea=d.flooded_area_pct||0,maxDepth=d.max_depth_m||0,runoffMm=d.runoff_mm||0,sev=d.severity_level||0;
+    set('h-ml-prob',mlProb.toFixed(1)+'%',mlProb>=60?'danger':mlProb>=40?'warn':'good');
+    set('h-flooded-area',floodedArea.toFixed(1)+'%',floodedArea>=50?'danger':floodedArea>=25?'warn':'good');
+    set('h-max-depth',(d.max_depth_m||0).toFixed(2)+' m',maxDepth>=1.2?'danger':maxDepth>=0.3?'warn':'good');
+    set('h-runoff',runoffMm.toFixed(1)+' mm');
+    set('h-wl-rise',(d.water_level_rise_m||0).toFixed(3)+' m');
+    set('h-avg-depth',(d.avg_depth_m||0).toFixed(2)+' m');
+    set('h-infiltration',(d.infiltration_mm||0).toFixed(1)+' mm');
+    set('h-runoff-coeff',(d.runoff_coefficient||0).toFixed(3));
+    document.getElementById('flooded-pct-label').textContent=floodedArea.toFixed(1)+'%';
+    document.getElementById('runoff-pct-label').textContent=((runoffMm/Math.max(rainfall,1))*100).toFixed(1)+'%';
+    document.getElementById('depth-pct-label').textContent=maxDepth.toFixed(2)+' m';
+    setTimeout(()=>{document.getElementById('flooded-bar').style.width=Math.min(100,floodedArea)+'%';document.getElementById('runoff-bar').style.width=Math.min(100,(runoffMm/Math.max(rainfall,1))*100)+'%';document.getElementById('depth-bar').style.width=Math.min(100,maxDepth/5*100)+'%';},50);
+    document.getElementById('flooded-bar').className='bar-fill '+(floodedArea>=50?'red':floodedArea>=25?'amber':'blue');
+    const badge=document.getElementById('severity-badge');badge.className='severity-badge '+sevClass(sev);badge.textContent='Class '+sev+' — '+(d.severity_label||'Unknown');
+    setTxt('d-ml-risk',d.ml_risk||'--');setTxt('d-ml-prob',mlProb.toFixed(2)+'%');setTxt('d-combined',d.combined_risk||'--');setTxt('d-severity','Class '+sev);setTxt('d-sev-label',d.severity_label||'--');
+    setTxt('d-cn',(d.curve_number||75).toString());setTxt('d-amc','AMC-'+(d.amc||'II'));setTxt('d-runoff',runoffMm.toFixed(2)+' mm');setTxt('d-infiltration',(d.infiltration_mm||0).toFixed(2)+' mm');setTxt('d-runoff-coeff',(d.runoff_coefficient||0).toFixed(3));setTxt('d-wl-rise',(d.water_level_rise_m||0).toFixed(3)+' m');setTxt('d-flooded',floodedArea.toFixed(2)+'%');setTxt('d-maxdepth',maxDepth.toFixed(3)+' m');setTxt('d-avgdepth',(d.avg_depth_m||0).toFixed(3)+' m');
+    document.getElementById('chart-cn-label').textContent=d.curve_number||75;
+    const scenarios=d.scenarios||[];
+    if(hydroChart)hydroChart.destroy();
+    hydroChart=new Chart(document.getElementById('hydro-chart'),{type:'line',data:{labels:scenarios.map(s=>s.rainfall_mm),datasets:[{label:'Flooded Area (%)',data:scenarios.map(s=>s.flooded_area_pct),borderColor:'#0369a1',backgroundColor:'rgba(14,165,233,0.07)',borderWidth:2.5,pointRadius:4,fill:true,tension:0.3,yAxisID:'y'},{label:'Runoff (mm)',data:scenarios.map(s=>s.runoff_mm),borderColor:'#0891b2',backgroundColor:'rgba(8,145,178,0.04)',borderWidth:2,pointRadius:3,fill:false,tension:0.3,yAxisID:'y2'},{label:'Max Depth (m)',data:scenarios.map(s=>s.max_depth_m),borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,0.04)',borderWidth:2,pointRadius:3,fill:false,tension:0.3,yAxisID:'y3'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{color:'#4a7fa5',boxWidth:12,font:{size:12}}}},scales:{x:{title:{display:true,text:'Rainfall (mm/hr)',color:'#4a7fa5',font:{size:11}},ticks:{color:'#4a7fa5'},grid:{color:'rgba(14,165,233,0.07)'}},y:{title:{display:true,text:'Flooded Area (%)',color:'#0369a1',font:{size:11}},ticks:{color:'#0369a1'},grid:{color:'rgba(14,165,233,0.07)'},min:0,max:100},y2:{position:'right',title:{display:true,text:'Runoff (mm)',color:'#0891b2',font:{size:11}},ticks:{color:'#0891b2'},grid:{drawOnChartArea:false},min:0},y3:{position:'right',title:{display:false},ticks:{color:'#dc2626'},grid:{drawOnChartArea:false},min:0,display:false}}}});
+    const recos=[];
+    if(mlProb>=60||floodedArea>=50||sev>=3){recos.push('Evacuate all residents from low-lying and flood-prone areas immediately');recos.push('Activate emergency response teams and NDRF/SDRF units');recos.push('Open all relief camps — helpline 1070 | Police 100 | Ambulance 108');recos.push('Issue public broadcast alerts via radio, TV, and SMS systems');}
+    else if(mlProb>=40||floodedArea>=25||sev>=2){recos.push('Issue flood advisory to at-risk communities');recos.push('Pre-position rescue equipment near flood-prone zones');recos.push('Monitor river gauges and rain gauges every hour');recos.push('Alert hospitals and health centres to prepare');}
+    else{recos.push('Continue standard monitoring of rainfall and water levels');recos.push('Ensure drainage channels are clear of blockages');recos.push('Keep emergency contacts ready — Helpline 1070');}
+    document.getElementById('reco-list').innerHTML=recos.map(r=>`<li>${r}</li>`).join('');
+    document.getElementById('reco-card').style.display='block';
+    document.getElementById('results-section').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-function renderResults(d, rainfall) {
-    document.getElementById('results-section').style.display = 'block';
-
-    const risk = (d.combined_risk || 'Low').toLowerCase();
-    const banner = document.getElementById('risk-banner');
-    const riskKey = (risk === 'high' || risk === 'very high') ? 'high' : (risk === 'medium' || risk === 'moderate') ? 'moderate' : 'low';
-    banner.className = 'risk-banner ' + riskKey;
-    const riskEmoji = riskKey==='high' ? '⚠ HIGH FLOOD RISK — IMMEDIATE ACTION' : riskKey==='moderate' ? '⚡ MODERATE RISK — STAY ALERT' : '✓ LOW RISK — CONDITIONS STABLE';
-    banner.textContent = riskEmoji + '   |   ' + d.location;
-
-    const mlProb      = d.ml_probability   || 0;
-    const floodedArea = d.flooded_area_pct || 0;
-    const maxDepth    = d.max_depth_m      || 0;
-    const runoffMm    = d.runoff_mm        || 0;
-    const sev         = d.severity_level   || 0;
-
-    const probColor  = mlProb      >= 60 ? 'danger' : mlProb      >= 40 ? 'warn' : 'good';
-    const areaColor  = floodedArea >= 50 ? 'danger' : floodedArea >= 25 ? 'warn' : 'good';
-    const depthColor = maxDepth    >= 1.2 ? 'danger' : maxDepth   >= 0.3 ? 'warn' : 'good';
-
-    // Metric cards
-    set('h-ml-prob',      mlProb.toFixed(1)                     + '%', probColor);
-    set('h-flooded-area', floodedArea.toFixed(1)                + '%', areaColor);
-    set('h-max-depth',    (d.max_depth_m   ||0).toFixed(2)      + ' m', depthColor);
-    set('h-runoff',       runoffMm.toFixed(1)                   + ' mm');
-    set('h-wl-rise',      (d.water_level_rise_m||0).toFixed(3)  + ' m');
-    set('h-avg-depth',    (d.avg_depth_m   ||0).toFixed(2)      + ' m');
-    set('h-infiltration', (d.infiltration_mm||0).toFixed(1)     + ' mm');
-    set('h-runoff-coeff', (d.runoff_coefficient||0).toFixed(3));
-
-    // Bars
-    document.getElementById('flooded-pct-label').textContent  = floodedArea.toFixed(1) + '%';
-    document.getElementById('runoff-pct-label').textContent   = ((runoffMm / Math.max(rainfall,1))*100).toFixed(1) + '%';
-    document.getElementById('depth-pct-label').textContent    = maxDepth.toFixed(2) + ' m';
-    setTimeout(() => {
-        document.getElementById('flooded-bar').style.width = Math.min(100, floodedArea) + '%';
-        document.getElementById('runoff-bar').style.width  = Math.min(100, (runoffMm/Math.max(rainfall,1))*100) + '%';
-        document.getElementById('depth-bar').style.width   = Math.min(100, maxDepth/5*100) + '%';
-    }, 50);
-    document.getElementById('flooded-bar').className = 'bar-fill ' + (floodedArea >= 50 ? 'red' : floodedArea >= 25 ? 'amber' : 'blue');
-
-    // Severity badge
-    const badge = document.getElementById('severity-badge');
-    badge.className = 'severity-badge ' + sevClass(sev);
-    badge.textContent = 'Class ' + sev + ' — ' + (d.severity_label || 'Unknown');
-
-    // Detail rows
-    setTxt('d-ml-risk',      d.ml_risk       || '--');
-    setTxt('d-ml-prob',      mlProb.toFixed(2) + '%');
-    setTxt('d-combined',     d.combined_risk || '--');
-    setTxt('d-severity',     'Class ' + sev);
-    setTxt('d-sev-label',    d.severity_label || '--');
-    setTxt('d-cn',           (d.curve_number || 75).toString());
-    setTxt('d-amc',          'AMC-' + (d.amc || 'II'));
-    setTxt('d-runoff',       runoffMm.toFixed(2) + ' mm');
-    setTxt('d-infiltration', (d.infiltration_mm||0).toFixed(2) + ' mm');
-    setTxt('d-runoff-coeff', (d.runoff_coefficient||0).toFixed(3));
-    setTxt('d-wl-rise',      (d.water_level_rise_m||0).toFixed(3) + ' m');
-    setTxt('d-flooded',      floodedArea.toFixed(2) + '%');
-    setTxt('d-maxdepth',     maxDepth.toFixed(3) + ' m');
-    setTxt('d-avgdepth',     (d.avg_depth_m||0).toFixed(3) + ' m');
-
-    document.getElementById('chart-cn-label').textContent = d.curve_number || 75;
-
-    // Scenario chart
-    const scenarios = d.scenarios || [];
-    const labels    = scenarios.map(s => s.rainfall_mm);
-    const flooded   = scenarios.map(s => s.flooded_area_pct);
-    const depths    = scenarios.map(s => s.max_depth_m);
-    const runoffs   = scenarios.map(s => s.runoff_mm);
-
-    if (hydroChart) hydroChart.destroy();
-    hydroChart = new Chart(document.getElementById('hydro-chart'), {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [
-                { label:'Flooded Area (%)', data:flooded, borderColor:'#0369a1', backgroundColor:'rgba(14,165,233,0.08)', borderWidth:2.5, pointRadius:4, fill:true, tension:0.3, yAxisID:'y' },
-                { label:'Runoff (mm)',      data:runoffs, borderColor:'#0891b2', backgroundColor:'rgba(8,145,178,0.05)',  borderWidth:2,   pointRadius:3, fill:false,tension:0.3, yAxisID:'y2' },
-                { label:'Max Depth (m)',    data:depths,  borderColor:'#dc2626', backgroundColor:'rgba(220,38,38,0.05)',  borderWidth:2,   pointRadius:3, fill:false,tension:0.3, yAxisID:'y3' },
-            ]
-        },
-        options:{
-            responsive:true, maintainAspectRatio:false,
-            plugins:{
-                legend:{display:true,position:'top',labels:{color:'#4a7fa5',boxWidth:12,font:{size:12}}},
-                tooltip:{callbacks:{title:ctx=>'Rainfall: '+ctx[0].label+' mm'}}
-            },
-            scales:{
-                x:{title:{display:true,text:'Rainfall (mm/hr)',color:'#4a7fa5',font:{size:11}},ticks:{color:'#4a7fa5'},grid:{color:'rgba(14,165,233,0.08)'}},
-                y:{title:{display:true,text:'Flooded Area (%)',color:'#0369a1',font:{size:11}},ticks:{color:'#0369a1'},grid:{color:'rgba(14,165,233,0.08)'},min:0,max:100},
-                y2:{position:'right',title:{display:true,text:'Runoff (mm)',color:'#0891b2',font:{size:11}},ticks:{color:'#0891b2'},grid:{drawOnChartArea:false},min:0},
-                y3:{position:'right',title:{display:true,text:'Max Depth (m)',color:'#dc2626',font:{size:11}},ticks:{color:'#dc2626'},grid:{drawOnChartArea:false},min:0,display:false}
-            }
-        }
-    });
-
-    // Recommendations
-    const recos = [];
-    if (mlProb >= 60 || floodedArea >= 50 || sev >= 3) {
-        recos.push('Evacuate all residents from low-lying and flood-prone areas immediately');
-        recos.push('Activate emergency response teams and NDRF/SDRF units');
-        recos.push('Open all relief camps — helpline 1070 | Police 100 | Ambulance 108');
-        recos.push('Issue public broadcast alerts via radio, TV, and SMS systems');
-    } else if (mlProb >= 40 || floodedArea >= 25 || sev >= 2) {
-        recos.push('Issue flood advisory to at-risk communities');
-        recos.push('Pre-position rescue equipment near flood-prone zones');
-        recos.push('Monitor river gauges and rain gauges every hour');
-        recos.push('Alert hospitals and health centres to prepare');
-    } else {
-        recos.push('Continue standard monitoring of rainfall and water levels');
-        recos.push('Ensure drainage channels are clear of blockages');
-        recos.push('Keep emergency contacts ready — Helpline 1070');
-    }
-
-    const recoCard = document.getElementById('reco-card');
-    document.getElementById('reco-list').innerHTML = recos.map(r => `<li>${r}</li>`).join('');
-    recoCard.style.display = 'block';
-    document.getElementById('results-section').scrollIntoView({ behavior:'smooth', block:'start' });
+function runBatch(){
+    const location=document.getElementById('b-location').value,cn=parseFloat(document.getElementById('b-cn').value)||75,amc=document.getElementById('b-amc').value;
+    const btn=document.getElementById('batch-btn'),spinner=document.getElementById('b-spinner');
+    btn.disabled=true;spinner.style.display='block';
+    fetch('/api/hydrology/batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location,curve_number:cn,amc,rainfalls:[10,25,50,75,100,125,150,175,200,250,300]})})
+        .then(r=>r.json()).then(d=>{btn.disabled=false;spinner.style.display='none';renderBatch(d.results||[]);})
+        .catch(()=>{btn.disabled=false;spinner.style.display='none';});
 }
 
-/* ── BATCH ── */
-function runBatch() {
-    const location = document.getElementById('b-location').value;
-    const cn       = parseFloat(document.getElementById('b-cn').value)  || 75;
-    const amc      = document.getElementById('b-amc').value;
-    const btn      = document.getElementById('batch-btn');
-    const spinner  = document.getElementById('b-spinner');
-
-    btn.disabled = true; spinner.style.display = 'block';
-
-    fetch('/api/hydrology/batch', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ location, curve_number: cn, amc,
-            rainfalls:[10,25,50,75,100,125,150,175,200,250,300] })
-    })
-    .then(r => r.json())
-    .then(d => {
-        btn.disabled = false; spinner.style.display = 'none';
-        renderBatch(d.results || []);
-    })
-    .catch(() => { btn.disabled = false; spinner.style.display = 'none'; });
+const SEV_COLORS={None:'#16a34a',Low:'#16a34a',Moderate:'#d97706',Significant:'#dc2626',Extreme:'#991b1b'};
+function renderBatch(rows){
+    document.getElementById('batch-results').style.display='block';
+    document.getElementById('batch-tbody').innerHTML=rows.map(r=>{const col=SEV_COLORS[r.severity]||'#4a7fa5';return`<tr><td><strong>${r.rainfall_mm}</strong></td><td>${r.runoff_mm}</td><td>${r.infiltration_mm}</td><td>${r.runoff_coeff}</td><td>${r.water_level_rise}</td><td>${r.flooded_area_pct}%</td><td>${r.max_depth_m}</td><td><span class="sev-cell" style="background:${col}22;color:${col};border:1px solid ${col}44;">${r.severity}</span></td></tr>`;}).join('');
+    if(batchChart)batchChart.destroy();
+    batchChart=new Chart(document.getElementById('batch-chart'),{type:'bar',data:{labels:rows.map(r=>r.rainfall_mm),datasets:[{label:'Flooded Area (%)',data:rows.map(r=>r.flooded_area_pct),backgroundColor:'rgba(14,165,233,0.45)',borderColor:'#0369a1',borderWidth:1.5,yAxisID:'y'},{label:'Runoff (mm)',data:rows.map(r=>r.runoff_mm),type:'line',borderColor:'#d97706',backgroundColor:'rgba(217,119,6,0.09)',borderWidth:2.5,pointRadius:4,fill:false,tension:0.3,yAxisID:'y2'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{color:'#4a7fa5',boxWidth:12}}},scales:{x:{ticks:{color:'#4a7fa5'},grid:{color:'rgba(14,165,233,0.07)'}},y:{title:{display:true,text:'Flooded Area (%)',color:'#0369a1'},ticks:{color:'#0369a1'},grid:{color:'rgba(14,165,233,0.07)'},min:0,max:100},y2:{position:'right',title:{display:true,text:'Runoff (mm)',color:'#d97706'},ticks:{color:'#d97706'},grid:{drawOnChartArea:false},min:0}}}});
+    document.getElementById('batch-results').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-const SEV_COLORS = {None:'#16a34a',Low:'#16a34a',Moderate:'#d97706',Significant:'#dc2626',Extreme:'#991b1b'};
+function set(id,text,colorClass){const el=document.getElementById(id);if(!el)return;el.textContent=text;el.className='metric-val'+(colorClass?' '+colorClass:'');}
+function setTxt(id,text){const el=document.getElementById(id);if(el)el.textContent=text;}
 
-function renderBatch(rows) {
-    document.getElementById('batch-results').style.display = 'block';
-
-    // Table
-    const tbody = document.getElementById('batch-tbody');
-    tbody.innerHTML = rows.map(r => {
-        const col = SEV_COLORS[r.severity] || '#4a7fa5';
-        return `<tr>
-            <td><strong>${r.rainfall_mm}</strong></td>
-            <td>${r.runoff_mm}</td><td>${r.infiltration_mm}</td>
-            <td>${r.runoff_coeff}</td><td>${r.water_level_rise}</td>
-            <td>${r.flooded_area_pct}%</td><td>${r.max_depth_m}</td>
-            <td><span class="sev-cell" style="background:${col}22;color:${col};border:1px solid ${col}44;">${r.severity}</span></td>
-        </tr>`;
-    }).join('');
-
-    // Chart
-    const labels   = rows.map(r => r.rainfall_mm);
-    const flooded  = rows.map(r => r.flooded_area_pct);
-    const runoffs  = rows.map(r => r.runoff_mm);
-
-    if (batchChart) batchChart.destroy();
-    batchChart = new Chart(document.getElementById('batch-chart'), {
-        type:'bar',
-        data:{
-            labels,
-            datasets:[
-                { label:'Flooded Area (%)', data:flooded, backgroundColor:'rgba(14,165,233,0.5)', borderColor:'#0369a1', borderWidth:1.5, yAxisID:'y' },
-                { label:'Runoff (mm)',      data:runoffs, type:'line', borderColor:'#d97706', backgroundColor:'rgba(217,119,6,0.1)', borderWidth:2.5, pointRadius:4, fill:false, tension:0.3, yAxisID:'y2' }
-            ]
-        },
-        options:{
-            responsive:true, maintainAspectRatio:false,
-            plugins:{legend:{display:true,position:'top',labels:{color:'#4a7fa5',boxWidth:12}}},
-            scales:{
-                x:{ticks:{color:'#4a7fa5'},grid:{color:'rgba(14,165,233,0.08)'}},
-                y:{title:{display:true,text:'Flooded Area (%)',color:'#0369a1'},ticks:{color:'#0369a1'},grid:{color:'rgba(14,165,233,0.08)'},min:0,max:100},
-                y2:{position:'right',title:{display:true,text:'Runoff (mm)',color:'#d97706'},ticks:{color:'#d97706'},grid:{drawOnChartArea:false},min:0}
-            }
-        }
-    });
-
-    document.getElementById('batch-results').scrollIntoView({ behavior:'smooth', block:'start' });
-}
-
-/* ── HELPERS ── */
-function set(id, text, colorClass) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = text;
-    el.className = 'metric-val' + (colorClass ? ' ' + colorClass : '');
-}
-function setTxt(id, text) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = text;
-}
-
-// Auto-run on load
-window.addEventListener('load', () => { runHydrology(); });
+window.addEventListener('load',()=>{runHydrology();});
 </script>
 </body>
 </html>
