@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Dashboard — Flood Prediction System</title>
+    <title>Live Dashboard — FloodWatch India</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,577 +12,214 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
     <style>
         :root {
-            --deep:    #edf6ff;
-            --abyss:   #e8f4fd;
-            --navy:    #ddeeff;
-            --ocean:   #c5e4f7;
-            --teal:    #0891b2;
-            --cyan:    #0369a1;
-            --ice:     #0ea5e9;
-            --foam:    #1e3a5f;
-            --danger:  #dc2626;
-            --warn:    #d97706;
-            --safe:    #16a34a;
-            --glass:   rgba(255,255,255,0.78);
-            --glass2:  rgba(200,230,255,0.55);
-            --border:  rgba(14,165,233,0.2);
-            --glow:    0 2px 16px rgba(14,165,233,0.15);
+            --brand:  #0369a1; --accent: #0891b2;
+            --danger: #dc2626; --warn:   #d97706; --safe: #16a34a;
+            --bg:     #edf6ff; --glass:  rgba(255,255,255,0.82);
+            --border: rgba(14,165,233,0.2); --text: #1e3a5f; --muted: #4a7fa5;
         }
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        body { background:var(--bg); color:var(--text); font-family:'Exo 2',sans-serif; min-height:100vh; overflow-x:hidden; }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            background:#edf6ff;
-            color: #1e3a5f;
-            font-family: 'Exo 2', sans-serif;
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-
-        /* ══ ANIMATED FLOOD BACKGROUND ══ */
         body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
+            content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
             background:
-                radial-gradient(ellipse 70% 50% at 10% 20%,  rgba(186,230,255,0.65) 0%, transparent 55%),
-                radial-gradient(ellipse 60% 50% at 90% 80%,  rgba(147,210,255,0.55) 0%, transparent 55%),
-                radial-gradient(ellipse 80% 40% at 50% 100%, rgba(186,230,255,0.4)  0%, transparent 50%),
-                linear-gradient(180deg, #dbeeff 0%, #eaf5ff 35%, #f0f9ff 70%, #e8f4fd 100%);
-            z-index: 0;
-            pointer-events: none;
+                radial-gradient(ellipse 70% 50% at 10% 20%, rgba(186,230,255,.65) 0%, transparent 55%),
+                radial-gradient(ellipse 60% 50% at 90% 80%, rgba(147,210,255,.55) 0%, transparent 55%),
+                linear-gradient(180deg,#dbeeff 0%,#eaf5ff 40%,#f0f9ff 100%);
         }
 
-        /* Rain streaks */
-        body::after {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background-image:
-                repeating-linear-gradient(0deg,  transparent, transparent 40px, rgba(14,165,233,0.04) 40px, rgba(14,165,233,0.04) 41px),
-                repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(14,165,233,0.04) 40px, rgba(14,165,233,0.04) 41px);
-            
-            z-index: 0;
-            pointer-events: none;
-        }
+        /* ── WAVES ── */
+        .wave-container { position:fixed; bottom:0; left:0; right:0; height:100px; z-index:0; overflow:hidden; pointer-events:none; }
+        .wave { position:absolute; bottom:0; left:-100%; width:300%; height:100%;
+            background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120'%3E%3Cpath d='M0,60 C150,100 350,20 600,60 C850,100 1050,20 1200,60 L1200,120 L0,120 Z' fill='rgba(14,165,233,0.07)'/%3E%3C/svg%3E") repeat-x;
+            background-size:600px 100px; }
+        .wave1{animation:wave 8s linear infinite;}
+        .wave2{animation:wave 12s linear infinite reverse;opacity:.5;bottom:6px;}
+        .wave3{animation:wave 6s linear infinite;opacity:.25;bottom:12px;}
+        @keyframes wave{from{transform:translateX(0)}to{transform:translateX(33.33%)}}
 
-        @keyframes rain {
-            from { background-position: 0 -100vh; }
-            to   { background-position: 0 100vh; }
-        }
-
-        /* Waves at bottom */
-        .wave-container {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            height: 120px;
-            z-index: 0;
-            overflow: hidden;
-            pointer-events: none;
-        }
-
-        .wave {
-            position: absolute;
-            bottom: 0; left: -100%;
-            width: 300%;
-            height: 100%;
-            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120'%3E%3Cpath d='M0,60 C150,100 350,20 600,60 C850,100 1050,20 1200,60 L1200,120 L0,120 Z' fill='rgba(14,165,233,0.08)'/%3E%3C/svg%3E") repeat-x;
-            background-size: 600px 120px;
-        }
-
-        .wave1 { animation: wave 8s linear infinite; opacity: 1; }
-        .wave2 { animation: wave 12s linear infinite reverse; opacity: 0.6; bottom: 8px; }
-        .wave3 { animation: wave 6s linear infinite; opacity: 0.3; bottom: 16px; }
-
-        @keyframes wave {
-            from { transform: translateX(0); }
-            to   { transform: translateX(33.33%); }
-        }
-
-        /* Floating particles */
-        .particles {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        .particle {
-            position: absolute;
-            width: 2px; height: 2px;
-            background: #0369a1;
-            border-radius: 50%;
-            opacity: 0;
-            animation: float-up var(--dur, 8s) var(--delay, 0s) linear infinite;
-        }
-
-        @keyframes float-up {
-            0%   { transform: translateY(100vh) translateX(0);   opacity: 0; }
-            10%  { opacity: 0.6; }
-            90%  { opacity: 0.3; }
-            100% { transform: translateY(-10vh) translateX(30px); opacity: 0; }
-        }
-
-        /* ══ TOPBAR ══ */
+        /* ── TOPBAR ── */
         .topbar {
-            position: sticky; top: 0; z-index: 200;
-            background:rgba(255,255,255,0.88);
-            backdrop-filter: blur(20px);
-            border-bottom:1px solid rgba(14,165,233,0.2); box-shadow:0 2px 16px rgba(14,165,233,0.1);
-            padding: 0 28px;
-            display: flex; align-items: center; justify-content: space-between;
-            height: 64px;
+            position:sticky; top:0; z-index:200;
+            background:rgba(255,255,255,0.92); backdrop-filter:blur(20px);
+            border-bottom:1px solid var(--border); box-shadow:0 2px 16px rgba(14,165,233,.1);
+            padding:0 24px; display:flex; align-items:center; justify-content:space-between; height:64px;
         }
-
-        .topbar-left { display: flex; align-items: center; gap: 14px; }
-
-        .topbar-left h1 {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 15px; font-weight: 700;
-            color: #0369a1;
-            letter-spacing: 1px;
-            ;
-        }
-
-        .live-pill {
-            display: inline-flex; align-items: center; gap: 6px;
-            background: rgba(22,163,74,0.08);
-            border: 1px solid rgba(22,163,74,0.15);
-            padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700;
-            color: #16a34a; letter-spacing: 1px;
-        }
-
-        .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #16a34a; animation: blink 1.4s infinite; }
-        @keyframes blink { 0%,100%{opacity:1;box-shadow:0 0 6px #16a34a} 50%{opacity:0.2;box-shadow:none} }
-
-        .topbar nav a {
-            color:#4a7fa5; text-decoration: none;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 13px; font-weight: 600;
-            margin-left: 8px; padding: 7px 16px;
-            border-radius: 8px;
-            border: 1px solid transparent;
-            transition: all 0.2s; letter-spacing: 0.5px;
-        }
-
-        .topbar nav a:hover,
-        .topbar nav a.active {
-            background:rgba(200,230,255,0.55); border-color:rgba(14,165,233,0.2); color:#0369a1;
-        }
-
-        /* ══ PAGE ══ */
-        .page {
-            position: relative; z-index: 1;
-            max-width: 1160px; margin: 0 auto;
-            padding: 28px 18px 100px;
-        }
-
-        /* ══ SECTION TITLE ══ */
-        .sec-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 11px; font-weight: 700;
-            color: #0369a1; letter-spacing: 2px;
-            text-transform: uppercase;
-            margin-bottom: 16px; padding-bottom: 10px;
-            border-bottom: 1px solid rgba(14,165,233,0.2);
-            display: flex; align-items: center; gap: 10px;
-        }
-
-        .sec-title::before {
-            content: '';
-            width: 3px; height: 18px;
-            background: linear-gradient(180deg, #0369a1, #0891b2);
-            border-radius: 2px;
-            display: inline-block;
-        }
-
-        .divider { border: none; border-top: 1px solid rgba(14,165,233,0.2); margin: 32px 0; }
-
-        /* ══ SENSOR CARDS ══ */
-        .sensor-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 18px; }
-
-        .sensor-card {
-            background: rgba(255,255,255,0.78);
-            border: 1px solid rgba(14,165,233,0.2);
-            border-radius: 16px; padding: 24px 18px;
-            text-align: center;
-            backdrop-filter: blur(10px);
-            position: relative; overflow: hidden;
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-
-        .sensor-card::before {
-            content: '';
-            position: absolute; top: 0; left: 0; right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #0369a1, #0891b2);
-        }
-
-        .sensor-card.s-water::before { background: linear-gradient(90deg, #0891b2, #16a34a); }
-        .sensor-card.s-flow::before  { background: linear-gradient(90deg, #7c3aed, #0891b2); }
-
-        .sensor-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 2px 16px rgba(14,165,233,0.15);
-            border-color: rgba(14,165,233,0.12);
-        }
-
-        .sensor-card::after {
-            content: '';
-            position: absolute; bottom: -30px; right: -20px;
-            width: 80px; height: 80px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(14,165,233,0.12) 0%, transparent 70%);
-        }
-
-        .s-val {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 2.2rem; font-weight: 900; color: #0369a1;
-            line-height: 1.1; margin-bottom: 8px;
-            ;
-        }
-
-        .s-label { font-size: 10px; color: #4a7fa5; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-
-        /* ══ ALERT BOX ══ */
-        .alert-box {
-            border-radius: 12px; padding: 16px 24px;
-            text-align: center; font-size: 15px; font-weight: 700;
-            margin-bottom: 18px;
-            background: rgba(255,255,255,0.78);
-            border: 1px solid rgba(14,165,233,0.2);
-            color: #2c5282;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 12px; letter-spacing: 1px;
-            transition: all 0.4s;
-            backdrop-filter: blur(10px);
-        }
-
-        .alert-box.high {
-            background: rgba(220,38,38,0.08);
-            border-color: rgba(220,38,38,0.15);
-            color: #dc2626;
-            box-shadow: 0 0 30px rgba(220,38,38,0.1);
-            animation: pulse-red 2s ease infinite;
-        }
-
-        .alert-box.moderate {
-            background: rgba(217,119,6,0.08);
-            border-color: rgba(217,119,6,0.15);
-            color: #d97706;
-            box-shadow: 0 0 20px rgba(217,119,6,0.1);
-        }
-
-        .alert-box.low {
-            background: rgba(22,163,74,0.08);
-            border-color: rgba(22,163,74,0.15);
-            color: #16a34a;
-        }
-
-        @keyframes pulse-red {
-            0%,100% { box-shadow: 0 0 20px rgba(220,38,38,0.1); }
-            50%      { box-shadow: 0 0 40px rgba(220,38,38,0.15); }
-        }
-
-        /* ══ STATS ══ */
-        .stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 28px; }
-
-        .stat-card {
-            background: rgba(255,255,255,0.78);
-            border: 1px solid rgba(14,165,233,0.2);
-            border-radius: 14px; padding: 18px;
-            text-align: center;
-            backdrop-filter: blur(10px);
-            transition: border-color 0.2s;
-        }
-
-        .stat-card:hover { border-color: rgba(14,165,233,0.12); }
-
-        .stat-num {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 2rem; font-weight: 900; color: #0369a1;
-            ;
-        }
-
-        .stat-num.danger { color: #dc2626; ; }
-        .stat-num.good   { color: #16a34a;   ; }
-
-        .stat-label { font-size: 10px; color: #4a7fa5; margin-top: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-
-        /* ══ DISTRICT PANEL ══ */
-        .district-panel {
-            background: rgba(255,255,255,0.78);
-            border: 1px solid rgba(14,165,233,0.2);
-            border-radius: 18px; padding: 26px;
-            margin-bottom: 28px;
-            backdrop-filter: blur(10px);
-        }
-
-        .select-row {
-            display: grid; grid-template-columns: 1fr 1fr auto;
-            gap: 14px; align-items: end; margin-bottom: 20px;
-        }
-
-        .sel-group label {
-            display: block; font-size: 10px; font-weight: 700;
-            color: #0369a1; text-transform: uppercase; letter-spacing: 1px;
-            margin-bottom: 8px;
-        }
-
-        .sel-group select {
-            width: 100%; padding: 11px 14px;
-            background:rgba(255,255,255,0.88);
-            border: 1px solid rgba(14,165,233,0.2);
-            border-radius: 10px;
-            font-size: 14px; color: #1e3a5f;
-            font-family: 'Exo 2', sans-serif;
-            cursor: pointer;
-            transition: border-color 0.2s, box-shadow 0.2s;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%230369a1' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 12px center;
-            padding-right: 36px;
-        }
-
-        .sel-group select:focus {
-            outline: none;
-            border-color: #0369a1;
-            box-shadow: 0 0 0 3px rgba(14,165,233,0.12);
-        }
-
-        .sel-group select:disabled { opacity: 0.3; cursor: not-allowed; }
-        .sel-group select option { background: white; }
-
-        .predict-btn {
-            padding: 11px 26px; border: none; border-radius: 10px;
-            background: linear-gradient(135deg, #0891b2, #c5e4f7);
-            color: white; font-size: 13px; font-weight: 700;
-            font-family: 'Exo 2', sans-serif;
-            cursor: pointer; white-space: nowrap; letter-spacing: 0.5px;
-            border: 1px solid #0369a1;
-            box-shadow:0 2px 16px rgba(14,165,233,0.1);
-            transition: all 0.2s;
-            height: 44px;
-        }
-
-        .predict-btn:hover { transform: translateY(-2px); box-shadow: 0 0 30px rgba(14,165,233,0.12); }
-        .predict-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
-
-        /* Result card */
-        .district-result { display: none; }
-
-        .result-header {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 18px 22px; border-radius: 12px; margin-bottom: 16px;
-        }
-
-        .result-header.high {
-            background: rgba(220,38,38,0.08);
-            border: 1px solid rgba(220,38,38,0.15);
-            color: #dc2626;
-        }
-
-        .result-header.moderate {
-            background: rgba(217,119,6,0.08);
-            border: 1px solid rgba(217,119,6,0.15);
-            color: #d97706;
-        }
-
-        .result-header.low {
-            background: rgba(22,163,74,0.08);
-            border: 1px solid rgba(22,163,74,0.15);
-            color: #16a34a;
-        }
-
-        .result-header .rh-title { font-family: 'Orbitron', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 1px; }
-        .result-header .rh-sub   { font-size: 12px; opacity: 0.75; margin-top: 4px; }
-        .result-header .rh-prob  { font-family: 'Orbitron', sans-serif; font-size: 30px; font-weight: 900; }
-
-        .result-metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 16px; }
-
-        .metric-box {
-            background: rgba(14,165,233,0.12);
-            border: 1px solid rgba(14,165,233,0.2);
-            border-radius: 12px; padding: 14px; text-align: center;
-        }
-
-        .metric-val { font-family: 'Orbitron', sans-serif; font-size: 1.3rem; font-weight: 800; color: #0369a1; }
-        .metric-lbl { font-size: 10px; color: #4a7fa5; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 6px; }
-
-        /* Prob bar */
-        .prob-track { background: rgba(14,165,233,0.12); border-radius: 8px; height: 10px; overflow: hidden; margin: 4px 0 10px; border: 1px solid rgba(14,165,233,0.2); }
-        .prob-fill  { height: 100%; border-radius: 8px; transition: width 0.9s ease; }
-        .prob-fill.high     { background: linear-gradient(90deg, #f87171, #dc2626); }
-        .prob-fill.moderate { background: linear-gradient(90deg, #ffd566, #ffb800); box-shadow: 0 0 10px rgba(217,119,6,0.15); }
-        .prob-fill.low      { background: linear-gradient(90deg, #4ade80, #16a34a);shadow: 0 0 10px rgba(22,163,74,0.15); }
-
-        /* Recommendation strip */
-        .reco-strip {
-            background: rgba(217,119,6,0.15);
-            border-radius: 10px; padding: 14px 18px;
-            border-left: 3px solid #d97706;
-            font-size: 13px; color: rgba(255,206,85,0.9); display: none;
-        }
-
-        .reco-strip strong { color: #d97706; font-family: 'Orbitron', sans-serif; font-size: 11px; letter-spacing: 1px; }
-        .reco-strip ul { list-style: none; padding: 0; margin: 8px 0 0; }
-        .reco-strip li { padding: 5px 0; display: flex; gap: 10px; color: #2c5282; font-size: 13px; }
-        .reco-strip li::before { content: "›"; color: #d97706; font-weight: 700; font-size: 16px; line-height: 1.2; }
-
-        /* Map */
-        #district-map { height: 380px; border-radius: 12px; margin-top: 14px; border: 1px solid rgba(14,165,233,0.2); display: none; }
-
-        .use-loc-btn {
-            width: 100%; padding: 13px;
-            border: 1px dashed rgba(14,165,233,0.12);
-            border-radius: 12px;
-            background: rgba(14,165,233,0.12);
-            color: #0369a1; font-size: 13px; font-weight: 700;
-            font-family: 'Exo 2', sans-serif;
-            cursor: pointer; transition: all 0.2s; margin-bottom: 4px;
-            letter-spacing: 0.5px;
-        }
-
-        .use-loc-btn:hover { background: rgba(14,165,233,0.12); border-style: solid; transform: translateY(-1px); }
-        .use-loc-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
-
-        .d-route-btn {
-            width: 100%; margin-top: 14px; padding: 13px; border: none;
-            border-radius: 12px; background: linear-gradient(135deg, #15803d, #16a34a);
-            color: white; font-size: 13px; font-weight: 700;
-            font-family: 'Exo 2', sans-serif;
-            cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px;
-        }
-
-        .d-route-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(22,163,74,0.15); }
-
-        .d-route-panel {
-            background: rgba(22,163,74,0.15); border-radius: 12px;
-            padding: 16px 18px; margin-top: 12px; border-left: 3px solid #16a34a;
-        }
-
-        .d-route-panel h3 { color: #16a34a; margin-bottom: 12px; font-size: 12px; font-weight: 700; font-family: 'Orbitron', sans-serif; letter-spacing: 1px; }
-
-        .d-shelter-list { list-style: none; padding: 0; }
-
-        .d-shelter-list li {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 9px 0; border-bottom: 1px solid rgba(22,163,74,0.08); font-size: 13px;
-            color: #2c5282;
-        }
-
-        .d-shelter-list li:last-child { border-bottom: none; }
-
-        .d-shelter-list a {
-            background: rgba(14,165,233,0.12); color: #0369a1; text-decoration: none;
-            padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 700;
-            border: 1px solid rgba(14,165,233,0.12); margin-left: 8px;
-            transition: all 0.2s; white-space: nowrap;
-        }
-
-        .d-shelter-list a:hover { background: rgba(14,165,233,0.12); }
-
-        /* Loading spinner */
-        .spinner {
-            display: none; width: 20px; height: 20px;
-            border: 2px solid rgba(14,165,233,0.12);
-            border-top-color: #0369a1;
-            border-radius: 50%; animation: spin 0.7s linear infinite;
-            margin: 0 auto;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* ══ HISTORY TABLE ══ */
-        .table-wrap {
-            background: rgba(255,255,255,0.78);
-            border: 1px solid rgba(14,165,233,0.2);
-            border-radius: 16px; padding: 20px;
-            backdrop-filter: blur(10px);
-            overflow-x: auto;
-        }
-
-        .last-upd { font-size: 11px; color: #4a7fa5; margin-bottom: 14px; letter-spacing: 0.5px; }
-
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-
-        thead tr { background: rgba(14,165,233,0.12); }
-
-        th {
-            padding: 12px 14px; text-align: left;
-            font-size: 10px; font-weight: 700; color: #0369a1;
-            text-transform: uppercase; letter-spacing: 1px;
-            font-family: 'Orbitron', sans-serif;
-            border-bottom: 1px solid rgba(14,165,233,0.2);
-        }
-
-        td { padding: 11px 14px; border-bottom: 1px solid rgba(14,165,233,0.12); color: #2c5282; }
-
-        tbody tr:last-child td { border-bottom: none; }
-        tbody tr:hover td { background: rgba(14,165,233,0.12); color: #1e3a5f; }
-
-        .row-new { animation: slidein 0.35s ease; }
-        @keyframes slidein { from{opacity:0;transform:translateY(-6px)} to{opacity:1} }
-
-        .b-high     { background: rgba(220,38,38,0.1); color: #dc2626; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; border: 1px solid rgba(220,38,38,0.15); font-family: 'Orbitron', sans-serif; letter-spacing: 0.5px; }
-        .b-moderate { background: rgba(217,119,6,0.1); color: #d97706; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; border: 1px solid rgba(217,119,6,0.15); font-family: 'Orbitron', sans-serif; letter-spacing: 0.5px; }
-        .b-low      { background: rgba(22,163,74,0.08); color: #16a34a; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; border: 1px solid rgba(22,163,74,0.15); font-family: 'Orbitron', sans-serif; letter-spacing: 0.5px; }
-        .b-unknown  { background: rgba(255,255,255,0.08); color: #4a7fa5; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; }
+        .topbar-left { display:flex; align-items:center; gap:12px; }
+        .topbar-left h1 { font-family:'Orbitron',sans-serif; font-size:14px; font-weight:700; color:var(--brand); letter-spacing:.8px; }
+        .live-pill { display:inline-flex; align-items:center; gap:5px; background:rgba(22,163,74,.08); border:1px solid rgba(22,163,74,.2); padding:3px 10px; border-radius:20px; font-size:10px; font-weight:700; color:var(--safe); letter-spacing:1px; }
+        .live-dot { width:6px; height:6px; border-radius:50%; background:var(--safe); animation:blink 1.4s infinite; }
+        @keyframes blink{0%,100%{opacity:1;box-shadow:0 0 5px var(--safe)}50%{opacity:.2;box-shadow:none}}
+
+        /* Desktop nav */
+        .topbar nav { display:flex; gap:4px; }
+        .topbar nav a { color:var(--muted); text-decoration:none; font-family:'Exo 2',sans-serif; font-size:13px; font-weight:600; padding:7px 14px; border-radius:8px; border:1px solid transparent; transition:all .2s; letter-spacing:.4px; }
+        .topbar nav a:hover, .topbar nav a.active { background:rgba(14,165,233,.1); border-color:var(--border); color:var(--brand); }
+        .topbar nav a.nav-logout { background:rgba(220,38,38,.06); border-color:rgba(220,38,38,.15); color:var(--danger); }
+
+        /* Hamburger */
+        .hamburger { display:none; flex-direction:column; gap:5px; cursor:pointer; padding:8px; border:none; background:none; }
+        .hamburger span { width:22px; height:2px; background:var(--brand); border-radius:2px; transition:all .3s; }
+        .hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+        .hamburger.open span:nth-child(2){opacity:0}
+        .hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+        .mobile-menu { display:none; position:fixed; top:64px; left:0; right:0; z-index:199; background:rgba(255,255,255,.97); backdrop-filter:blur(20px); border-bottom:1px solid var(--border); padding:12px 16px; flex-direction:column; gap:4px; box-shadow:0 8px 24px rgba(14,165,233,.1); }
+        .mobile-menu.open { display:flex; }
+        .mobile-menu a { color:var(--muted); text-decoration:none; font-family:'Exo 2',sans-serif; font-size:14px; font-weight:600; padding:11px 14px; border-radius:10px; border:1px solid transparent; transition:all .2s; }
+        .mobile-menu a:hover, .mobile-menu a.active { background:rgba(14,165,233,.08); border-color:var(--border); color:var(--brand); }
+        .mobile-menu a.nav-logout { color:var(--danger); border-color:rgba(220,38,38,.15); }
+
+        /* ── PAGE ── */
+        .page { position:relative; z-index:1; max-width:1160px; margin:0 auto; padding:24px 16px 100px; }
+
+        /* ── SECTION TITLE ── */
+        .sec-title { font-family:'Orbitron',sans-serif; font-size:11px; font-weight:700; color:var(--brand); letter-spacing:2px; text-transform:uppercase; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+        .sec-title::before { content:''; width:3px; height:16px; background:linear-gradient(180deg,var(--brand),var(--accent)); border-radius:2px; flex-shrink:0; }
+        .divider { border:none; border-top:1px solid var(--border); margin:28px 0; }
+        .sec-header-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:10px; }
+
+        /* ── SENSOR CARDS ── */
+        .sensor-row { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px; }
+        .sensor-card { background:var(--glass); border:1px solid var(--border); border-radius:16px; padding:22px 16px; text-align:center; backdrop-filter:blur(10px); position:relative; overflow:hidden; transition:transform .3s,box-shadow .3s; }
+        .sensor-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,var(--brand),var(--accent)); }
+        .sensor-card.s-water::before { background:linear-gradient(90deg,var(--accent),var(--safe)); }
+        .sensor-card.s-flow::before  { background:linear-gradient(90deg,#7c3aed,var(--accent)); }
+        .sensor-card:hover { transform:translateY(-4px); box-shadow:0 8px 24px rgba(14,165,233,.12); }
+        .s-val { font-family:'Orbitron',sans-serif; font-size:2rem; font-weight:900; color:var(--brand); line-height:1.1; margin-bottom:8px; }
+        .s-label { font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.8px; }
+
+        /* ── ALERT BOX ── */
+        .alert-box { border-radius:12px; padding:14px 20px; text-align:center; margin-bottom:16px; background:var(--glass); border:1px solid var(--border); color:#2c5282; font-family:'Orbitron',sans-serif; font-size:11px; letter-spacing:.8px; transition:all .4s; backdrop-filter:blur(10px); }
+        .alert-box.high     { background:rgba(220,38,38,.07);  border-color:rgba(220,38,38,.2);  color:var(--danger); animation:pulse-red 2s ease infinite; }
+        .alert-box.moderate { background:rgba(217,119,6,.07);  border-color:rgba(217,119,6,.2);  color:var(--warn); }
+        .alert-box.low      { background:rgba(22,163,74,.07);  border-color:rgba(22,163,74,.2);  color:var(--safe); }
+        @keyframes pulse-red{0%,100%{box-shadow:0 0 16px rgba(220,38,38,.08)}50%{box-shadow:0 0 32px rgba(220,38,38,.15)}}
+
+        /* ── STATS ROW ── */
+        .stats-row { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:22px; }
+        .stat-card { background:var(--glass); border:1px solid var(--border); border-radius:14px; padding:18px; text-align:center; backdrop-filter:blur(10px); transition:border-color .2s; }
+        .stat-card:hover { border-color:rgba(14,165,233,.4); }
+        .stat-num { font-family:'Orbitron',sans-serif; font-size:1.9rem; font-weight:900; color:var(--brand); }
+        .stat-num.danger { color:var(--danger); }
+        .stat-num.good   { color:var(--safe); }
+        .stat-label { font-size:10px; color:var(--muted); margin-top:6px; font-weight:700; text-transform:uppercase; letter-spacing:1px; }
+
+
+
+        /* ── DISTRICT PANEL ── */
+        .district-panel { background:var(--glass); border:1px solid var(--border); border-radius:18px; padding:24px; margin-bottom:24px; backdrop-filter:blur(10px); }
+        .select-row { display:grid; grid-template-columns:1fr 1fr auto; gap:14px; align-items:end; margin-bottom:18px; }
+        .sel-group label { display:block; font-size:10px; font-weight:700; color:var(--brand); text-transform:uppercase; letter-spacing:1px; margin-bottom:7px; }
+        .sel-group select { width:100%; padding:11px 36px 11px 14px; background:rgba(255,255,255,.9); border:1px solid var(--border); border-radius:10px; font-size:14px; color:var(--text); font-family:'Exo 2',sans-serif; cursor:pointer; transition:border-color .2s,box-shadow .2s; appearance:none;
+            background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%230369a1' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat:no-repeat; background-position:right 12px center; }
+        .sel-group select:focus { outline:none; border-color:var(--brand); box-shadow:0 0 0 3px rgba(14,165,233,.12); }
+        .sel-group select:disabled { opacity:.35; cursor:not-allowed; }
+        .predict-btn { padding:11px 22px; border:none; border-radius:10px; background:linear-gradient(135deg,var(--brand),var(--accent)); color:white; font-size:13px; font-weight:700; font-family:'Exo 2',sans-serif; cursor:pointer; white-space:nowrap; border:1px solid var(--brand); box-shadow:0 2px 12px rgba(14,165,233,.2); transition:all .2s; height:44px; }
+        .predict-btn:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(14,165,233,.3); }
+        .predict-btn:disabled { opacity:.35; cursor:not-allowed; transform:none; }
 
         /* OR divider */
-        .or-divider { display:flex;align-items:center;gap:12px;margin-bottom:14px; }
-        .or-divider div { flex:1;height:1px;background:rgba(14,165,233,0.2); }
-        .or-divider span { font-size:11px;color:#4a7fa5;font-weight:600;letter-spacing:1px; }
+        .or-divider { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+        .or-divider div { flex:1; height:1px; background:var(--border); }
+        .or-divider span { font-size:11px; color:var(--muted); font-weight:600; letter-spacing:1px; }
 
-        /* Location label pill */
-        .loc-pill {
-            font-size: 11px; color: #0369a1; font-weight: 700;
-            background: rgba(14,165,233,0.12);
-            border: 1px solid rgba(14,165,233,0.12);
-            padding: 4px 14px; border-radius: 20px;
-            font-family: 'Orbitron', sans-serif; letter-spacing: 0.5px;
+        .use-loc-btn { width:100%; padding:12px; border:1px dashed rgba(14,165,233,.25); border-radius:12px; background:rgba(14,165,233,.05); color:var(--brand); font-size:13px; font-weight:700; font-family:'Exo 2',sans-serif; cursor:pointer; transition:all .2s; margin-bottom:4px; }
+        .use-loc-btn:hover { background:rgba(14,165,233,.1); border-style:solid; }
+        .use-loc-btn:disabled { opacity:.35; cursor:not-allowed; }
+        #loc-detect-status { font-size:12px; color:var(--brand); margin-top:8px; text-align:center; font-weight:600; }
+
+        /* Result card */
+        .district-result { display:none; }
+        .result-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-radius:12px; margin-bottom:14px; }
+        .result-header.high     { background:rgba(220,38,38,.07);  border:1px solid rgba(220,38,38,.15);  color:var(--danger); }
+        .result-header.moderate { background:rgba(217,119,6,.07);  border:1px solid rgba(217,119,6,.15);  color:var(--warn); }
+        .result-header.low      { background:rgba(22,163,74,.07);  border:1px solid rgba(22,163,74,.15);  color:var(--safe); }
+        .rh-title { font-family:'Orbitron',sans-serif; font-size:13px; font-weight:700; letter-spacing:.8px; }
+        .rh-sub   { font-size:12px; opacity:.75; margin-top:3px; }
+        .rh-prob  { font-family:'Orbitron',sans-serif; font-size:28px; font-weight:900; }
+
+        .result-metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:14px; }
+        .metric-box { background:rgba(14,165,233,.07); border:1px solid var(--border); border-radius:12px; padding:14px; text-align:center; }
+        .metric-val { font-family:'Orbitron',sans-serif; font-size:1.25rem; font-weight:800; color:var(--brand); }
+        .metric-lbl { font-size:10px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-top:5px; }
+
+        .prob-track { background:rgba(14,165,233,.1); border-radius:8px; height:10px; overflow:hidden; margin:6px 0 10px; border:1px solid var(--border); }
+        .prob-fill  { height:100%; border-radius:8px; transition:width .9s ease; }
+        .prob-fill.high     { background:linear-gradient(90deg,#f87171,var(--danger)); }
+        .prob-fill.moderate { background:linear-gradient(90deg,#fcd34d,var(--warn)); }
+        .prob-fill.low      { background:linear-gradient(90deg,#4ade80,var(--safe)); }
+
+        .reco-strip { background:rgba(217,119,6,.08); border-radius:10px; padding:14px 18px; border-left:3px solid var(--warn); display:none; margin-bottom:12px; }
+        .reco-strip strong { color:var(--warn); font-family:'Orbitron',sans-serif; font-size:11px; letter-spacing:1px; }
+        .reco-strip ul { list-style:none; padding:0; margin:8px 0 0; }
+        .reco-strip li { padding:5px 0; display:flex; gap:10px; color:#2c5282; font-size:13px; border-bottom:1px solid rgba(217,119,6,.1); }
+        .reco-strip li:last-child { border-bottom:none; }
+        .reco-strip li::before { content:"›"; color:var(--warn); font-weight:700; font-size:16px; line-height:1.2; }
+
+        #district-map { height:360px; border-radius:12px; margin-top:12px; border:1px solid var(--border); display:none; }
+
+        .d-route-btn { width:100%; margin-top:12px; padding:12px; border:none; border-radius:12px; background:linear-gradient(135deg,#15803d,var(--safe)); color:white; font-size:13px; font-weight:700; font-family:'Exo 2',sans-serif; cursor:pointer; transition:all .2s; }
+        .d-route-btn:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(22,163,74,.2); }
+        .d-route-panel { background:rgba(22,163,74,.07); border-radius:12px; padding:16px 18px; margin-top:12px; border-left:3px solid var(--safe); }
+        .d-route-panel h3 { color:var(--safe); margin-bottom:12px; font-size:11px; font-weight:700; font-family:'Orbitron',sans-serif; letter-spacing:1px; }
+        .d-shelter-list { list-style:none; padding:0; }
+        .d-shelter-list li { display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid rgba(22,163,74,.1); font-size:13px; color:#2c5282; }
+        .d-shelter-list li:last-child { border-bottom:none; }
+        .d-shelter-list a { background:rgba(14,165,233,.1); color:var(--brand); text-decoration:none; padding:5px 12px; border-radius:6px; font-size:11px; font-weight:700; border:1px solid var(--border); margin-left:8px; transition:all .2s; white-space:nowrap; }
+        .d-shelter-list a:hover { background:rgba(14,165,233,.18); }
+
+        .spinner { display:none; width:20px; height:20px; border:2px solid rgba(14,165,233,.2); border-top-color:var(--brand); border-radius:50%; animation:spin .7s linear infinite; margin:0 auto; }
+        @keyframes spin{to{transform:rotate(360deg)}}
+
+        /* ── TABLE ── */
+        .table-wrap { background:var(--glass); border:1px solid var(--border); border-radius:16px; padding:20px; backdrop-filter:blur(10px); overflow-x:auto; }
+        .last-upd { font-size:11px; color:var(--muted); margin-bottom:12px; letter-spacing:.4px; }
+        table { width:100%; border-collapse:collapse; font-size:13px; }
+        thead tr { background:rgba(14,165,233,.07); }
+        th { padding:11px 14px; text-align:left; font-size:10px; font-weight:700; color:var(--brand); text-transform:uppercase; letter-spacing:1px; font-family:'Orbitron',sans-serif; border-bottom:1px solid var(--border); }
+        td { padding:11px 14px; border-bottom:1px solid rgba(14,165,233,.08); color:#2c5282; }
+        tbody tr:last-child td { border-bottom:none; }
+        tbody tr:hover td { background:rgba(14,165,233,.05); }
+        .row-new { animation:slidein .35s ease; }
+        @keyframes slidein{from{opacity:0;transform:translateY(-6px)}to{opacity:1}}
+        .b-high     { background:rgba(220,38,38,.09);  color:var(--danger); padding:3px 10px; border-radius:6px; font-size:10px; font-weight:700; border:1px solid rgba(220,38,38,.15); font-family:'Orbitron',sans-serif; letter-spacing:.4px; }
+        .b-moderate { background:rgba(217,119,6,.09);  color:var(--warn);   padding:3px 10px; border-radius:6px; font-size:10px; font-weight:700; border:1px solid rgba(217,119,6,.15);  font-family:'Orbitron',sans-serif; letter-spacing:.4px; }
+        .b-low      { background:rgba(22,163,74,.07);  color:var(--safe);   padding:3px 10px; border-radius:6px; font-size:10px; font-weight:700; border:1px solid rgba(22,163,74,.15);  font-family:'Orbitron',sans-serif; letter-spacing:.4px; }
+        .b-unknown  { background:rgba(255,255,255,.06); color:var(--muted); padding:3px 10px; border-radius:6px; font-size:10px; font-weight:700; }
+
+        .loc-pill { font-size:11px; color:var(--brand); font-weight:700; background:rgba(14,165,233,.09); border:1px solid var(--border); padding:4px 14px; border-radius:20px; font-family:'Orbitron',sans-serif; letter-spacing:.4px; }
+
+        footer { text-align:center; font-size:11px; color:#6b9ab8; padding:20px 0 0; position:relative; z-index:1; font-family:'Orbitron',sans-serif; letter-spacing:1px; }
+
+        /* ── RESPONSIVE ── */
+        @media(max-width:768px){
+            .topbar nav { display:none; }
+            .hamburger { display:flex; }
+            .sensor-row  { grid-template-columns:1fr 1fr; }
+            .stats-row   { grid-template-columns:1fr 1fr; }
+            .select-row  { grid-template-columns:1fr; }
+            .predict-btn { width:100%; height:44px; }
+            .result-metrics { grid-template-columns:1fr 1fr; }
+            .accuracy-metrics { gap:14px; }
+            .acc-divider { display:none; }
         }
-
-        /* Section header row */
-        .sec-header-row {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 16px; padding-bottom: 10px;
-            border-bottom: 1px solid rgba(14,165,233,0.2);
-        }
-
-        footer {
-            text-align: center; font-size: 11px; color: #6b9ab8;
-            padding: 20px 0 0; position: relative; z-index: 1;
-            font-family: 'Orbitron', sans-serif; letter-spacing: 1px;
-        }
-
-        /* Loc detect status */
-        #loc-detect-status { font-size: 12px; color: #0369a1; margin-top: 8px; text-align: center; font-weight: 600; }
-
-        @media (max-width: 640px) {
-            .sensor-row, .stats-row, .loc-row, .result-metrics { grid-template-columns: 1fr; }
-            .select-row { grid-template-columns: 1fr; }
-            .predict-btn { width: 100%; }
-            #map { height: 300px; }
+        @media(max-width:480px){
+            .sensor-row { grid-template-columns:1fr; }
+            .stats-row  { grid-template-columns:1fr; }
+            .result-metrics { grid-template-columns:1fr; }
+            .topbar-left h1 { font-size:12px; }
+            #district-map { height:280px; }
         }
     </style>
 </head>
 <body>
-
-<!-- Flood effect background elements -->
-<div class="wave-container">
-    <div class="wave wave1"></div>
-    <div class="wave wave2"></div>
-    <div class="wave wave3"></div>
-</div>
-
-<div class="particles" id="particles"></div>
+<div class="wave-container"><div class="wave wave1"></div><div class="wave wave2"></div><div class="wave wave3"></div></div>
 
 <!-- TOP BAR -->
 <div class="topbar">
     <div class="topbar-left">
-        <h1>⛈ Flood Prediction System</h1>
+        <h1>⛈ FloodWatch India</h1>
         <span class="live-pill"><span class="live-dot"></span>LIVE</span>
     </div>
     <nav>
@@ -590,13 +227,25 @@
         <a href="/dashboard" class="active">Dashboard</a>
         <a href="/alerts">Alerts</a>
         <a href="/hydrology">Hydrology</a>
-        <a href="/logout" style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);color:#dc2626;">Logout</a>
+        <a href="/logout" class="nav-logout">Logout</a>
     </nav>
+    <button class="hamburger" id="hamburger" onclick="toggleMenu()" aria-label="Menu">
+        <span></span><span></span><span></span>
+    </button>
+</div>
+
+<!-- MOBILE MENU -->
+<div class="mobile-menu" id="mobile-menu">
+    <a href="/">Home</a>
+    <a href="/dashboard" class="active">Dashboard</a>
+    <a href="/alerts">Alerts</a>
+    <a href="/hydrology">Hydrology</a>
+    <a href="/logout" class="nav-logout">Logout</a>
 </div>
 
 <div class="page">
 
-    <!-- ── LIVE SENSOR READINGS ── -->
+    <!-- LIVE SENSOR READINGS -->
     <div class="sec-header-row">
         <div class="sec-title" style="margin:0;border:none;padding:0;">Live Sensor Readings</div>
         <span class="loc-pill" id="sensor-location-label">📍 Chennai, Tamil Nadu</span>
@@ -617,7 +266,7 @@
         </div>
     </div>
 
-    <div class="alert-box" id="alert-box">⬡ Connecting to sensors...</div>
+    <div class="alert-box" id="alert-box">⬡ Connecting to sensors…</div>
 
     <div class="stats-row">
         <div class="stat-card">
@@ -634,65 +283,9 @@
         </div>
     </div>
 
-    <!-- ══ MODEL ACCURACY CARD ══ -->
-    <div id="accuracy-card" style="
-        background: rgba(22,163,74,0.15);
-        border: 1px solid rgba(22,163,74,0.15);
-        border-radius: 16px;
-        padding: 20px 24px;
-        margin-bottom: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 16px;
-        backdrop-filter: blur(10px);
-    ">
-        <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
-            <div style="text-align:center;">
-                <div style="font-family:'Orbitron',sans-serif;font-size:1.9rem;font-weight:900;color:#16a34a;;" id="acc-accuracy">--</div>
-                <div style="font-size:10px;color:#4a7fa5;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Accuracy</div>
-            </div>
-            <div style="text-align:center;">
-                <div style="font-family:'Orbitron',sans-serif;font-size:1.9rem;font-weight:900;color:#0369a1;;" id="acc-f1">--</div>
-                <div style="font-size:10px;color:#4a7fa5;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-top:4px;">F1-Score</div>
-            </div>
-            <div style="text-align:center;">
-                <div style="font-family:'Orbitron',sans-serif;font-size:1.9rem;font-weight:900;color:#d97706;;" id="acc-auc">--</div>
-                <div style="font-size:10px;color:#4a7fa5;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-top:4px;">ROC-AUC</div>
-            </div>
-            <div style="text-align:center;">
-                <div style="font-family:'Orbitron',sans-serif;font-size:1.9rem;font-weight:900;color:#0369a1;" id="acc-cv">--</div>
-                <div style="font-size:10px;color:#4a7fa5;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-top:4px;">CV Mean</div>
-            </div>
-            <div style="border-left:1px solid rgba(14,165,233,0.12);padding-left:18px;">
-                <div style="font-size:12px;color:#2c5282;font-weight:600;margin-bottom:2px;" id="acc-model">Logistic Regression</div>
-                <div style="font-size:11px;color:#4a7fa5;" id="acc-dataset">50,000 samples &nbsp;|&nbsp; 20 features</div>
-                <div style="font-size:11px;color:rgba(22,163,74,0.15);margin-top:4px;" id="acc-status">Loading...</div>
-            </div>
-        </div>
-        <a href="/model-accuracy" style="
-            display:inline-flex;align-items:center;gap:8px;
-            padding:12px 22px;
-            background:linear-gradient(135deg,rgba(22,163,74,0.15),rgba(14,165,233,0.12));
-            border:1px solid rgba(22,163,74,0.15);
-            border-radius:10px;
-            color:#16a34a;
-            font-family:'Exo 2',sans-serif;
-            font-size:13px;font-weight:700;
-            text-decoration:none;
-            letter-spacing:0.5px;
-            transition:all 0.2s;
-            white-space:nowrap;
-        " onmouseover="this.style.boxShadow='0 0 24px rgba(22,163,74,0.15)'"
-           onmouseout="this.style.boxShadow='none'">
-            View Full Report &#8594;
-        </a>
-    </div>
-
     <hr class="divider">
 
-    <!-- ══ STATE / DISTRICT FLOOD PREDICTION ══ -->
+    <!-- STATE / DISTRICT FLOOD PREDICTION -->
     <div class="sec-title">State &amp; District Flood Prediction</div>
 
     <div class="district-panel">
@@ -714,9 +307,7 @@
             </button>
         </div>
 
-        <div class="or-divider">
-            <div></div><span>OR</span><div></div>
-        </div>
+        <div class="or-divider"><div></div><span>OR</span><div></div></div>
 
         <button class="use-loc-btn" id="use-loc-btn" onclick="useMyLocation()">
             📍 Use My Current Location
@@ -725,9 +316,7 @@
 
         <div class="spinner" id="d-spinner"></div>
 
-        <!-- Result appears here -->
         <div class="district-result" id="district-result">
-
             <div class="result-header" id="result-header">
                 <div>
                     <div class="rh-title" id="rh-title">--</div>
@@ -735,30 +324,16 @@
                 </div>
                 <div class="rh-prob" id="rh-prob">--%</div>
             </div>
-
             <div class="result-metrics">
-                <div class="metric-box">
-                    <div class="metric-val" id="d-rainfall">--</div>
-                    <div class="metric-lbl">Rainfall (mm)</div>
-                </div>
-                <div class="metric-box">
-                    <div class="metric-val" id="d-water">--</div>
-                    <div class="metric-lbl">Water Level (m)</div>
-                </div>
-                <div class="metric-box">
-                    <div class="metric-val" id="d-flow">--</div>
-                    <div class="metric-lbl">River Flow (m³/s)</div>
-                </div>
+                <div class="metric-box"><div class="metric-val" id="d-rainfall">--</div><div class="metric-lbl">Rainfall (mm)</div></div>
+                <div class="metric-box"><div class="metric-val" id="d-water">--</div><div class="metric-lbl">Water Level (m)</div></div>
+                <div class="metric-box"><div class="metric-val" id="d-flow">--</div><div class="metric-lbl">Flow (m³/s)</div></div>
             </div>
-
             <div style="margin-bottom:12px;">
-                <div style="font-size:10px;color:#4a7fa5;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-family:'Orbitron',sans-serif;">Risk Probability</div>
-                <div class="prob-track">
-                    <div class="prob-fill" id="d-prob-fill" style="width:0%"></div>
-                </div>
-                <div style="font-size:11px;color:#4a7fa5;" id="d-timestamp">--</div>
+                <div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-family:'Orbitron',sans-serif;">Risk Probability</div>
+                <div class="prob-track"><div class="prob-fill" id="d-prob-fill" style="width:0%"></div></div>
+                <div style="font-size:11px;color:var(--muted);" id="d-timestamp">--</div>
             </div>
-
             <div class="reco-strip" id="reco-strip">
                 <strong>⚠ Recommended Actions</strong>
                 <ul>
@@ -769,12 +344,8 @@
                     <li>Stay away from rivers, drains, and water bodies</li>
                 </ul>
             </div>
-
             <div id="district-map"></div>
-
-            <button class="d-route-btn" id="d-route-btn" onclick="findDistrictRoute()" style="display:none;">
-                🛡 Find Safe Route to Nearest Shelter
-            </button>
+            <button class="d-route-btn" id="d-route-btn" onclick="findDistrictRoute()" style="display:none;">🛡 Find Safe Route to Nearest Shelter</button>
             <div class="d-route-panel" id="d-route-panel" style="display:none;">
                 <h3>🏥 Nearest Emergency Shelters — <span id="d-route-district-name"></span></h3>
                 <ul class="d-shelter-list" id="d-shelter-list"></ul>
@@ -784,7 +355,7 @@
 
     <hr class="divider">
 
-    <!-- ── HISTORY TABLE ── -->
+    <!-- HISTORY TABLE -->
     <div class="sec-header-row">
         <div class="sec-title" style="margin:0;border:none;padding:0;">Live Prediction History</div>
         <span class="loc-pill" id="history-location-label">📍 Chennai, Tamil Nadu</span>
@@ -795,15 +366,13 @@
         <table>
             <thead>
                 <tr>
-                    <th>#</th><th>Rainfall (mm)</th><th>Water Level (m)</th>
-                    <th>River Flow (m³/s)</th><th>Risk</th><th>Probability</th><th>Time</th>
+                    <th>#</th><th>Rainfall (mm)</th><th>Water (m)</th>
+                    <th>Flow (m³/s)</th><th>Risk</th><th>Prob.</th><th>Time</th>
                 </tr>
             </thead>
             <tbody id="pred-body">
                 <tr id="empty-row">
-                    <td colspan="7" style="text-align:center;color:#6b9ab8;padding:32px;font-family:'Orbitron',sans-serif;font-size:12px;letter-spacing:1px;">
-                        ⬡ Waiting for data...
-                    </td>
+                    <td colspan="7" style="text-align:center;color:#6b9ab8;padding:32px;font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:1px;">⬡ Waiting for data…</td>
                 </tr>
             </tbody>
         </table>
@@ -811,35 +380,31 @@
 
 </div>
 
-<footer><p>&copy; 2024 Flood Prediction System | Powered by AI</p></footer>
+<footer><p>&copy; 2024 FloodWatch India | AI-Powered Early Warning System</p></footer>
 
 <script>
+/* ── MOBILE NAV ── */
+function toggleMenu() {
+    const menu = document.getElementById('mobile-menu');
+    const btn  = document.getElementById('hamburger');
+    menu.classList.toggle('open');
+    btn.classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('mobile-menu');
+    const btn  = document.getElementById('hamburger');
+    if (!menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.classList.remove('open');
+        btn.classList.remove('open');
+    }
+});
+
 /* ── SESSION CHECK ── */
 fetch('/api/system-status').then(r=>{if(r.status===401)window.location.href='/login';}).catch(()=>{});
 
-/* ── FLOATING PARTICLES ── */
-(function() {
-    const container = document.getElementById('particles');
-    for (let i = 0; i < 30; i++) {
-        const p = document.createElement('div');
-        p.className = 'particle';
-        p.style.left = Math.random() * 100 + '%';
-        p.style.setProperty('--dur', (6 + Math.random() * 10) + 's');
-        p.style.setProperty('--delay', (Math.random() * 12) + 's');
-        p.style.width = p.style.height = (Math.random() > 0.5 ? 2 : 3) + 'px';
-        p.style.opacity = 0;
-        container.appendChild(p);
-    }
-})();
-
-/* ══════════════════════════════════════
-   1. LIVE SENSOR POLLING
-══════════════════════════════════════ */
+/* ── LIVE SENSOR POLLING ── */
 let totalCount = 0, warnCount = 0, safeCount = 0, rowNum = 1;
-
-let activeLat      = 13.0827;
-let activeLon      = 80.2707;
-let activeLocation = 'Chennai, Tamil Nadu';
+let activeLat = 13.0827, activeLon = 80.2707, activeLocation = 'Chennai, Tamil Nadu';
 
 function updateLocationLabels(name) {
     document.getElementById('sensor-location-label').textContent  = '📍 ' + name;
@@ -853,367 +418,140 @@ function fetchSensorData() {
             document.getElementById('live-rainfall').textContent = data.rainfall;
             document.getElementById('live-water').textContent    = data.water_level;
             document.getElementById('live-flow').textContent     = data.flow_rate;
-
-            const box  = document.getElementById('alert-box');
-            const risk = data.prediction.risk;
-            const prob = data.prediction.probability;
-
+            const box = document.getElementById('alert-box');
+            const risk = data.prediction.risk, prob = data.prediction.probability;
             box.className = 'alert-box';
-            if (risk === 'High')          { box.classList.add('high');     box.textContent = `⚠ FLOOD WARNING — ${activeLocation} — HIGH RISK (${prob}%)`; }
+            if      (risk === 'High')     { box.classList.add('high');     box.textContent = `⚠ FLOOD WARNING — ${activeLocation} — HIGH RISK (${prob}%)`; }
             else if (risk === 'Moderate') { box.classList.add('moderate'); box.textContent = `⚡ MODERATE RISK — ${activeLocation} (${prob}%)`; }
-            else                          { box.classList.add('low');      box.textContent = `✓ SAFE CONDITIONS — ${activeLocation} — LOW RISK (${prob}%)`; }
-
-            totalCount++;
-            if (risk === 'High' || risk === 'Moderate') warnCount++; else safeCount++;
+            else                          { box.classList.add('low');      box.textContent = `✓ SAFE CONDITIONS — ${activeLocation} (${prob}%)`; }
+            totalCount++; if (risk === 'High' || risk === 'Moderate') warnCount++; else safeCount++;
             document.getElementById('total-count').textContent   = totalCount;
             document.getElementById('warning-count').textContent = warnCount;
             document.getElementById('safe-count').textContent    = safeCount;
-
             const tbody = document.getElementById('pred-body');
-            const empty = document.getElementById('empty-row');
-            if (empty) empty.remove();
-
-            const tr = document.createElement('tr');
-            tr.className = 'row-new';
-            tr.innerHTML = `
-                <td>${rowNum++}</td><td>${data.rainfall}</td><td>${data.water_level}</td>
-                <td>${data.flow_rate}</td>
-                <td><span class="b-${risk.toLowerCase()}">${risk}</span></td>
-                <td style="color:#4a7fa5">${prob}%</td>
-                <td style="color:#4a7fa5;font-size:11px;">${data.timestamp}</td>`;
+            const empty = document.getElementById('empty-row'); if (empty) empty.remove();
+            const tr = document.createElement('tr'); tr.className = 'row-new';
+            tr.innerHTML = `<td>${rowNum++}</td><td>${data.rainfall}</td><td>${data.water_level}</td><td>${data.flow_rate}</td><td><span class="b-${risk.toLowerCase()}">${risk}</span></td><td style="color:var(--muted)">${prob}%</td><td style="color:var(--muted);font-size:11px;">${data.timestamp}</td>`;
             tbody.insertBefore(tr, tbody.firstChild);
             while (tbody.rows.length > 20) tbody.deleteRow(tbody.rows.length - 1);
             document.getElementById('last-upd').textContent = 'Last updated: ' + data.timestamp;
-        })
-        .catch(e => console.error('Sensor error:', e));
+        }).catch(e => console.error('Sensor error:', e));
 }
 fetchSensorData();
 setInterval(fetchSensorData, 5000);
 
-/* ══════════════════════════════════════
-   2. STATE / DISTRICT PREDICTION
-══════════════════════════════════════ */
+/* ── STATE / DISTRICT ── */
+let districtMap = null, selectedDistrictLat = null, selectedDistrictLon = null;
+let selectedDistrictName = '', selectedStateName = '', dRouteLines = [], dShelterMarkers = [];
 
-// Declare district state vars before any function uses them
-let districtMap = null;
-let selectedDistrictLat = null, selectedDistrictLon = null;
-let selectedDistrictName = '', selectedStateName = '';
-let dRouteLines = [], dShelterMarkers = [];
-
-// Load states into dropdown
-fetch('/api/states')
-    .then(r => r.json())
-    .then(data => {
-        const sel = document.getElementById('state-select');
-        data.states.forEach(s => {
-            const opt = document.createElement('option');
-            opt.value = s; opt.textContent = s;
-            sel.appendChild(opt);
-        });
-    }).catch(() => {});
+fetch('/api/states').then(r=>r.json()).then(data=>{
+    const sel = document.getElementById('state-select');
+    data.states.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o); });
+}).catch(()=>{});
 
 function loadDistricts() {
-    const state   = document.getElementById('state-select').value;
-    const distSel = document.getElementById('district-select');
-    const btn     = document.getElementById('predict-btn');
-
-    distSel.innerHTML = '<option value="">-- Choose District --</option>';
-    distSel.disabled  = true;
-    btn.disabled      = true;
-    document.getElementById('district-result').style.display = 'none';
-    document.getElementById('d-route-btn').style.display     = 'none';
-    document.getElementById('d-route-panel').style.display   = 'none';
-
-    if (!state) return;
-
-    fetch(`/api/districts/${encodeURIComponent(state)}`)
-        .then(r => r.json())
-        .then(data => {
-            data.districts.forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = d; opt.textContent = d;
-                distSel.appendChild(opt);
-            });
-            distSel.disabled = false;
-            distSel.onchange = () => { btn.disabled = !distSel.value; };
-        }).catch(() => {});
+    const state=document.getElementById('state-select').value, distSel=document.getElementById('district-select'), btn=document.getElementById('predict-btn');
+    distSel.innerHTML='<option value="">-- Choose District --</option>'; distSel.disabled=true; btn.disabled=true;
+    document.getElementById('district-result').style.display='none'; document.getElementById('d-route-btn').style.display='none'; document.getElementById('d-route-panel').style.display='none';
+    if(!state) return;
+    fetch(`/api/districts/${encodeURIComponent(state)}`).then(r=>r.json()).then(data=>{
+        data.districts.forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d; distSel.appendChild(o); });
+        distSel.disabled=false; distSel.onchange=()=>{ btn.disabled=!distSel.value; };
+    }).catch(()=>{});
 }
 
 function predictDistrict() {
-    const state    = document.getElementById('state-select').value;
-    const district = document.getElementById('district-select').value;
-    if (!state || !district) return;
-
-    document.getElementById('d-spinner').style.display       = 'block';
-    document.getElementById('district-result').style.display = 'none';
-    document.getElementById('predict-btn').disabled          = true;
-
-    fetch('/api/district-prediction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state, district })
-    })
-    .then(r => r.json())
-    .then(data => {
-        document.getElementById('d-spinner').style.display = 'none';
-        document.getElementById('predict-btn').disabled    = false;
-
-        if (!data.success) { alert('Error: ' + (data.error || 'Unknown error')); return; }
-
-        // Switch live sensor polling to this district
-        activeLat      = data.latitude;
-        activeLon      = data.longitude;
-        activeLocation = `${data.district}, ${data.state}`;
-        updateLocationLabels(activeLocation);
-        fetchSensorData();
-
-        const risk = data.prediction.risk;
-        const prob = data.prediction.probability;
-
-        // Result header
-        const hdr = document.getElementById('result-header');
-        hdr.className = 'result-header ' + risk.toLowerCase();
-        document.getElementById('rh-prob').textContent = prob + '%';
-
-        if (risk === 'High') {
-            document.getElementById('rh-title').textContent = '⚠ HIGH FLOOD RISK';
-            document.getElementById('rh-sub').textContent   = `${district}, ${state} — High flood risk`;
-        } else if (risk === 'Moderate') {
-            document.getElementById('rh-title').textContent = '⚡ MODERATE RISK';
-            document.getElementById('rh-sub').textContent   = `${district}, ${state} — Stay alert`;
-        } else {
-            document.getElementById('rh-title').textContent = '✓ CONDITIONS SAFE';
-            document.getElementById('rh-sub').textContent   = `${district}, ${state} — Low flood risk`;
-        }
-
-        // Metrics
-        document.getElementById('d-rainfall').textContent = data.rainfall;
-        document.getElementById('d-water').textContent    = data.water_level;
-        document.getElementById('d-flow').textContent     = data.flow_rate;
-
-        // Prob bar
-        const fill = document.getElementById('d-prob-fill');
-        fill.className = 'prob-fill ' + risk.toLowerCase();
-        setTimeout(() => { fill.style.width = prob + '%'; }, 50);
-        document.getElementById('d-timestamp').textContent = 'As of ' + data.timestamp;
-
-        // Recommendations
-        document.getElementById('reco-strip').style.display = (risk === 'High' || risk === 'Moderate') ? 'block' : 'none';
-
-        // Show result panel
-        document.getElementById('district-result').style.display = 'block';
-
-        // Mini map
-        const mapEl = document.getElementById('district-map');
-        mapEl.style.display = 'block';
-        const col = risk === 'High' ? '#dc2626' : risk === 'Moderate' ? '#d97706' : '#16a34a';
-
-        if (!districtMap) {
-            districtMap = L.map('district-map').setView([data.latitude, data.longitude], 11);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(districtMap);
-        } else {
-            districtMap.setView([data.latitude, data.longitude], 11);
-            districtMap.eachLayer(l => { if (l instanceof L.Marker || l instanceof L.Circle) districtMap.removeLayer(l); });
-        }
-
-        L.circle([data.latitude, data.longitude], { color:col, fillColor:col, fillOpacity:0.15, radius:8000, weight:2 })
-         .addTo(districtMap).bindPopup(`<b>${district}</b> — Risk: ${risk}`).openPopup();
-
-        const icon = L.divIcon({ html:`<div style="background:${col};color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;border:2px solid white;">D</div>`, className:'', iconSize:[26,26], iconAnchor:[13,13] });
-        L.marker([data.latitude, data.longitude], { icon }).addTo(districtMap)
-         .bindPopup(`<b>${district}, ${state}</b><br>Risk: <b>${risk}</b> (${prob}%)`);
-
-        // Save coords for route finding
-        selectedDistrictLat  = data.latitude;
-        selectedDistrictLon  = data.longitude;
-        selectedDistrictName = district;
-        selectedStateName    = state;
-        dRouteLines.forEach(l => districtMap && districtMap.removeLayer(l));
-        dShelterMarkers.forEach(m => districtMap && districtMap.removeLayer(m));
-        dRouteLines = []; dShelterMarkers = [];
-        document.getElementById('d-route-panel').style.display = 'none';
-        document.getElementById('d-route-btn').style.display   = 'block';
-
-        document.getElementById('district-result').scrollIntoView({ behavior:'smooth', block:'nearest' });
-    })
-    .catch(e => {
-        document.getElementById('d-spinner').style.display = 'none';
-        document.getElementById('predict-btn').disabled    = false;
-        console.error('District prediction error:', e);
-        alert('Failed to get prediction. Please try again.');
-    });
+    const state=document.getElementById('state-select').value, district=document.getElementById('district-select').value;
+    if(!state||!district) return;
+    document.getElementById('d-spinner').style.display='block'; document.getElementById('district-result').style.display='none'; document.getElementById('predict-btn').disabled=true;
+    fetch('/api/district-prediction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({state,district})})
+    .then(r=>r.json()).then(data=>{
+        document.getElementById('d-spinner').style.display='none'; document.getElementById('predict-btn').disabled=false;
+        if(!data.success){alert('Error: '+(data.error||'Unknown error'));return;}
+        activeLat=data.latitude; activeLon=data.longitude; activeLocation=`${data.district}, ${data.state}`; updateLocationLabels(activeLocation); fetchSensorData();
+        const risk=data.prediction.risk, prob=data.prediction.probability;
+        const hdr=document.getElementById('result-header'); hdr.className='result-header '+risk.toLowerCase();
+        document.getElementById('rh-prob').textContent=prob+'%';
+        if(risk==='High'){document.getElementById('rh-title').textContent='⚠ HIGH FLOOD RISK';document.getElementById('rh-sub').textContent=`${district}, ${state} — High flood risk`;}
+        else if(risk==='Moderate'){document.getElementById('rh-title').textContent='⚡ MODERATE RISK';document.getElementById('rh-sub').textContent=`${district}, ${state} — Stay alert`;}
+        else{document.getElementById('rh-title').textContent='✓ CONDITIONS SAFE';document.getElementById('rh-sub').textContent=`${district}, ${state} — Low flood risk`;}
+        document.getElementById('d-rainfall').textContent=data.rainfall; document.getElementById('d-water').textContent=data.water_level; document.getElementById('d-flow').textContent=data.flow_rate;
+        const fill=document.getElementById('d-prob-fill'); fill.className='prob-fill '+risk.toLowerCase(); setTimeout(()=>{fill.style.width=prob+'%';},50);
+        document.getElementById('d-timestamp').textContent='As of '+data.timestamp;
+        document.getElementById('reco-strip').style.display=(risk==='High'||risk==='Moderate')?'block':'none';
+        document.getElementById('district-result').style.display='block';
+        const mapEl=document.getElementById('district-map'); mapEl.style.display='block';
+        const col=risk==='High'?'#dc2626':risk==='Moderate'?'#d97706':'#16a34a';
+        if(!districtMap){districtMap=L.map('district-map').setView([data.latitude,data.longitude],11);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(districtMap);}
+        else{districtMap.setView([data.latitude,data.longitude],11);districtMap.eachLayer(l=>{if(l instanceof L.Marker||l instanceof L.Circle)districtMap.removeLayer(l);});}
+        L.circle([data.latitude,data.longitude],{color:col,fillColor:col,fillOpacity:.15,radius:8000,weight:2}).addTo(districtMap).bindPopup(`<b>${district}</b> — Risk: ${risk}`).openPopup();
+        const icon=L.divIcon({html:`<div style="background:${col};color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;border:2px solid white;">D</div>`,className:'',iconSize:[26,26],iconAnchor:[13,13]});
+        L.marker([data.latitude,data.longitude],{icon}).addTo(districtMap).bindPopup(`<b>${district}, ${state}</b><br>Risk: <b>${risk}</b> (${prob}%)`);
+        selectedDistrictLat=data.latitude; selectedDistrictLon=data.longitude; selectedDistrictName=district; selectedStateName=state;
+        dRouteLines.forEach(l=>districtMap&&districtMap.removeLayer(l)); dShelterMarkers.forEach(m=>districtMap&&districtMap.removeLayer(m)); dRouteLines=[]; dShelterMarkers=[];
+        document.getElementById('d-route-panel').style.display='none'; document.getElementById('d-route-btn').style.display='block';
+        document.getElementById('district-result').scrollIntoView({behavior:'smooth',block:'nearest'});
+    }).catch(e=>{ document.getElementById('d-spinner').style.display='none'; document.getElementById('predict-btn').disabled=false; console.error(e); alert('Failed to get prediction. Please try again.'); });
 }
 
 function useMyLocation() {
-    const btn    = document.getElementById('use-loc-btn');
-    const status = document.getElementById('loc-detect-status');
-    btn.disabled = true; btn.textContent = '⬡ Detecting...';
-    status.style.display = 'block';
-    status.textContent   = 'Requesting location...';
-
-    navigator.geolocation.getCurrentPosition(pos => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        status.textContent = `✓ Found (${lat.toFixed(4)}, ${lon.toFixed(4)}) — assessing risk...`;
-
-        fetch(`/api/location-risk?lat=${lat}&lon=${lon}`)
-            .then(r => r.json())
-            .then(riskData => {
-                const risk = riskData.prediction ? riskData.prediction.risk : 'Low';
-                const prob = riskData.prediction ? riskData.prediction.probability : 0;
-
-                selectedDistrictLat  = lat;
-                selectedDistrictLon  = lon;
-                selectedDistrictName = 'Your Location';
-                selectedStateName    = '';
-
-                activeLat      = lat;
-                activeLon      = lon;
-                activeLocation = `Your Location (${lat.toFixed(3)}, ${lon.toFixed(3)})`;
-                updateLocationLabels(activeLocation);
-                fetchSensorData();
-
-                const col = risk === 'High' ? '#dc2626' : risk === 'Moderate' ? '#d97706' : '#16a34a';
-                document.getElementById('rh-title').textContent = risk === 'High' ? '⚠ HIGH FLOOD RISK' : risk === 'Moderate' ? '⚡ MODERATE RISK' : '✓ LOW RISK — SAFE';
-                document.getElementById('rh-sub').textContent   = `Your Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
-                document.getElementById('rh-prob').textContent  = `${prob}%`;
-                const rh = document.getElementById('result-header');
-                rh.className = 'result-header ' + risk.toLowerCase();
-                document.getElementById('reco-strip').style.display = (risk === 'High' || risk === 'Moderate') ? 'block' : 'none';
-                document.getElementById('district-result').style.display = 'block';
-
-                const mapEl = document.getElementById('district-map');
-                mapEl.style.display = 'block';
-                if (!districtMap) {
-                    districtMap = L.map('district-map').setView([lat, lon], 14);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(districtMap);
-                } else {
-                    districtMap.setView([lat, lon], 14);
-                    districtMap.eachLayer(l => { if (!(l instanceof L.TileLayer)) districtMap.removeLayer(l); });
-                }
-                L.circle([lat, lon], { color:col, fillColor:col, fillOpacity:0.12, radius:600, weight:2 }).addTo(districtMap);
-                const youIcon = L.divIcon({ html:`<div style="background:#dc2626;color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;border:2px solid white;">Y</div>`, className:'', iconSize:[28,28], iconAnchor:[14,14] });
-                L.marker([lat, lon], { icon:youIcon }).addTo(districtMap).bindPopup(`<b>You are here</b><br>Risk: <b>${risk}</b>`).openPopup();
-
-                dRouteLines.forEach(l => districtMap.removeLayer(l));
-                dShelterMarkers.forEach(m => districtMap.removeLayer(m));
-                dRouteLines = []; dShelterMarkers = [];
-                document.getElementById('d-route-panel').style.display = 'none';
-                document.getElementById('d-route-btn').style.display   = 'block';
-
-                status.textContent  = `✓ Risk: ${risk} (${prob}%)`;
-                btn.disabled        = false;
-                btn.textContent     = '📍 Use My Current Location';
-                document.getElementById('district-result').scrollIntoView({ behavior:'smooth', block:'nearest' });
-            }).catch(() => {
-                status.textContent = 'Could not assess risk. Try manually.';
-                btn.disabled = false; btn.textContent = '📍 Use My Current Location';
-            });
-    }, err => {
-        const msgs = { 1:'Location access denied.', 2:'Position unavailable.', 3:'Timed out.' };
-        status.textContent = msgs[err.code] || 'Location error.';
-        btn.disabled = false; btn.textContent = '📍 Use My Current Location';
-    }, { enableHighAccuracy:true, timeout:15000 });
+    const btn=document.getElementById('use-loc-btn'), status=document.getElementById('loc-detect-status');
+    btn.disabled=true; btn.textContent='⬡ Detecting…'; status.style.display='block'; status.textContent='Requesting location…';
+    navigator.geolocation.getCurrentPosition(pos=>{
+        const lat=pos.coords.latitude, lon=pos.coords.longitude;
+        status.textContent=`✓ Found (${lat.toFixed(4)}, ${lon.toFixed(4)}) — assessing risk…`;
+        fetch(`/api/location-risk?lat=${lat}&lon=${lon}`).then(r=>r.json()).then(riskData=>{
+            const risk=riskData.prediction?riskData.prediction.risk:'Low', prob=riskData.prediction?riskData.prediction.probability:0;
+            selectedDistrictLat=lat; selectedDistrictLon=lon; selectedDistrictName='Your Location'; selectedStateName='';
+            activeLat=lat; activeLon=lon; activeLocation=`Your Location (${lat.toFixed(3)}, ${lon.toFixed(3)})`; updateLocationLabels(activeLocation); fetchSensorData();
+            const col=risk==='High'?'#dc2626':risk==='Moderate'?'#d97706':'#16a34a';
+            document.getElementById('rh-title').textContent=risk==='High'?'⚠ HIGH FLOOD RISK':risk==='Moderate'?'⚡ MODERATE RISK':'✓ LOW RISK — SAFE';
+            document.getElementById('rh-sub').textContent=`Your Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+            document.getElementById('rh-prob').textContent=`${prob}%`;
+            const rh=document.getElementById('result-header'); rh.className='result-header '+risk.toLowerCase();
+            document.getElementById('reco-strip').style.display=(risk==='High'||risk==='Moderate')?'block':'none';
+            document.getElementById('district-result').style.display='block';
+            const mapEl=document.getElementById('district-map'); mapEl.style.display='block';
+            if(!districtMap){districtMap=L.map('district-map').setView([lat,lon],14);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(districtMap);}
+            else{districtMap.setView([lat,lon],14);districtMap.eachLayer(l=>{if(!(l instanceof L.TileLayer))districtMap.removeLayer(l);});}
+            L.circle([lat,lon],{color:col,fillColor:col,fillOpacity:.12,radius:600,weight:2}).addTo(districtMap);
+            const youIcon=L.divIcon({html:`<div style="background:#dc2626;color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;border:2px solid white;">Y</div>`,className:'',iconSize:[28,28],iconAnchor:[14,14]});
+            L.marker([lat,lon],{icon:youIcon}).addTo(districtMap).bindPopup(`<b>You are here</b><br>Risk: <b>${risk}</b>`).openPopup();
+            dRouteLines.forEach(l=>districtMap.removeLayer(l)); dShelterMarkers.forEach(m=>districtMap.removeLayer(m)); dRouteLines=[]; dShelterMarkers=[];
+            document.getElementById('d-route-panel').style.display='none'; document.getElementById('d-route-btn').style.display='block';
+            status.textContent=`✓ Risk: ${risk} (${prob}%)`; btn.disabled=false; btn.textContent='📍 Use My Current Location';
+            document.getElementById('district-result').scrollIntoView({behavior:'smooth',block:'nearest'});
+        }).catch(()=>{ status.textContent='Could not assess risk. Try manually.'; btn.disabled=false; btn.textContent='📍 Use My Current Location'; });
+    },err=>{ const msgs={1:'Location access denied.',2:'Position unavailable.',3:'Timed out.'}; status.textContent=msgs[err.code]||'Location error.'; btn.disabled=false; btn.textContent='📍 Use My Current Location'; },{enableHighAccuracy:true,timeout:15000});
 }
 
 function findDistrictRoute() {
-    if (!selectedDistrictLat || !selectedDistrictLon) { alert('Select a district or use your location first.'); return; }
-    dRouteLines.forEach(l => districtMap.removeLayer(l));
-    dShelterMarkers.forEach(m => districtMap.removeLayer(m));
-    dRouteLines = []; dShelterMarkers = [];
-
-    const shelters = [
-        { name:`${selectedDistrictName} Govt. Relief Camp`,        lat:selectedDistrictLat+0.030, lon:selectedDistrictLon+0.020 },
-        { name:`${selectedDistrictName} Community Centre`,         lat:selectedDistrictLat-0.025, lon:selectedDistrictLon+0.038 },
-        { name:`District Emergency Shelter — North`,               lat:selectedDistrictLat+0.048, lon:selectedDistrictLon-0.012 },
-        { name:`Red Cross Flood Camp`,                             lat:selectedDistrictLat-0.042, lon:selectedDistrictLon-0.032 },
-        { name:`Municipal Flood Relief Centre`,                    lat:selectedDistrictLat+0.018, lon:selectedDistrictLon-0.048 },
-        { name:`Primary Health Centre Shelter`,                    lat:selectedDistrictLat-0.015, lon:selectedDistrictLon-0.055 },
-        { name:`${selectedDistrictName} High School Camp`,         lat:selectedDistrictLat+0.055, lon:selectedDistrictLon+0.040 },
+    if(!selectedDistrictLat||!selectedDistrictLon){alert('Select a district or use your location first.');return;}
+    dRouteLines.forEach(l=>districtMap.removeLayer(l)); dShelterMarkers.forEach(m=>districtMap.removeLayer(m)); dRouteLines=[]; dShelterMarkers=[];
+    const shelters=[
+        {name:`${selectedDistrictName} Govt. Relief Camp`,lat:selectedDistrictLat+0.030,lon:selectedDistrictLon+0.020},
+        {name:`${selectedDistrictName} Community Centre`,lat:selectedDistrictLat-0.025,lon:selectedDistrictLon+0.038},
+        {name:`District Emergency Shelter — North`,lat:selectedDistrictLat+0.048,lon:selectedDistrictLon-0.012},
+        {name:`Red Cross Flood Camp`,lat:selectedDistrictLat-0.042,lon:selectedDistrictLon-0.032},
+        {name:`Municipal Flood Relief Centre`,lat:selectedDistrictLat+0.018,lon:selectedDistrictLon-0.048},
+        {name:`Primary Health Centre Shelter`,lat:selectedDistrictLat-0.015,lon:selectedDistrictLon-0.055},
+        {name:`${selectedDistrictName} High School Camp`,lat:selectedDistrictLat+0.055,lon:selectedDistrictLon+0.040},
     ];
-
-    const sorted = shelters.map(s => {
-        const R=6371, dLat=(s.lat-selectedDistrictLat)*Math.PI/180, dLon=(s.lon-selectedDistrictLon)*Math.PI/180;
-        const a=Math.sin(dLat/2)**2+Math.cos(selectedDistrictLat*Math.PI/180)*Math.cos(s.lat*Math.PI/180)*Math.sin(dLon/2)**2;
-        return { ...s, dist:(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))).toFixed(2) };
-    }).sort((a,b)=>a.dist-b.dist);
-
-    const top5  = sorted.slice(0,5);
-    const colors = ['#0369a1','#0891b2','#16a34a','#d97706','#7c3aed'];
-    const labels = ['1st','2nd','3rd','4th','5th'];
-
-    const listEl = document.getElementById('d-shelter-list');
-    listEl.innerHTML = '';
-    const bounds = [[selectedDistrictLat, selectedDistrictLon]];
-
-    top5.forEach((s, i) => {
-        const line = L.polyline(
-            [[selectedDistrictLat, selectedDistrictLon],[s.lat, s.lon]],
-            { color:colors[i], weight: i===0 ? 4 : 3, dashArray: i===0 ? '12,5' : '7,6', opacity:0.92 }
-        ).addTo(districtMap);
-        dRouteLines.push(line);
-        bounds.push([s.lat, s.lon]);
-
-        const numIcon = L.divIcon({
-            html:`<div style="background:${colors[i]};color:white;border-radius:50%;width:28px;height:28px;
-                  display:flex;align-items:center;justify-content:center;font-weight:bold;
-                  font-size:13px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);">${i+1}</div>`,
-            className:'', iconSize:[28,28], iconAnchor:[14,14]
-        });
-        dShelterMarkers.push(
-            L.marker([s.lat, s.lon], { icon:numIcon })
-             .addTo(districtMap)
-             .bindPopup(`<b>${s.name}</b><br>📍 ${s.dist} km away<br><span style="color:${colors[i]};font-weight:700;">${labels[i]} nearest</span>`)
-        );
-
-        const li = document.createElement('li');
-        li.innerHTML = `
-            <span>
-                <span style="background:${colors[i]};color:white;border-radius:50%;width:22px;height:22px;
-                      display:inline-flex;align-items:center;justify-content:center;
-                      font-weight:bold;font-size:11px;margin-right:8px;">${i+1}</span>
-                ${s.name} — <strong style="color:#0369a1">${s.dist} km</strong>
-            </span>
-            <a href="https://www.google.com/maps/dir/${selectedDistrictLat},${selectedDistrictLon}/${s.lat},${s.lon}"
-               target="_blank" rel="noopener" style="background:${colors[i]};color:white;">Navigate</a>`;
-        listEl.appendChild(li);
+    const sorted=shelters.map(s=>{const R=6371,dLat=(s.lat-selectedDistrictLat)*Math.PI/180,dLon=(s.lon-selectedDistrictLon)*Math.PI/180,a=Math.sin(dLat/2)**2+Math.cos(selectedDistrictLat*Math.PI/180)*Math.cos(s.lat*Math.PI/180)*Math.sin(dLon/2)**2;return{...s,dist:(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))).toFixed(2)};}).sort((a,b)=>a.dist-b.dist);
+    const top5=sorted.slice(0,5), colors=['#0369a1','#0891b2','#16a34a','#d97706','#7c3aed'], labels=['1st','2nd','3rd','4th','5th'];
+    const listEl=document.getElementById('d-shelter-list'); listEl.innerHTML=''; const bounds=[[selectedDistrictLat,selectedDistrictLon]];
+    top5.forEach((s,i)=>{
+        const line=L.polyline([[selectedDistrictLat,selectedDistrictLon],[s.lat,s.lon]],{color:colors[i],weight:i===0?4:3,dashArray:i===0?'12,5':'7,6',opacity:.92}).addTo(districtMap); dRouteLines.push(line); bounds.push([s.lat,s.lon]);
+        const numIcon=L.divIcon({html:`<div style="background:${colors[i]};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.4);">${i+1}</div>`,className:'',iconSize:[28,28],iconAnchor:[14,14]});
+        dShelterMarkers.push(L.marker([s.lat,s.lon],{icon:numIcon}).addTo(districtMap).bindPopup(`<b>${s.name}</b><br>📍 ${s.dist} km away<br><span style="color:${colors[i]};font-weight:700;">${labels[i]} nearest</span>`));
+        const li=document.createElement('li'); li.innerHTML=`<span><span style="background:${colors[i]};color:white;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:11px;margin-right:8px;">${i+1}</span>${s.name} — <strong style="color:#0369a1">${s.dist} km</strong></span><a href="https://www.google.com/maps/dir/${selectedDistrictLat},${selectedDistrictLon}/${s.lat},${s.lon}" target="_blank" rel="noopener" style="background:${colors[i]};color:white;">Navigate</a>`; listEl.appendChild(li);
     });
-
-    districtMap.fitBounds(bounds, { padding:[40,40] });
-    document.getElementById('d-route-district-name').textContent = selectedStateName ? `${selectedDistrictName}, ${selectedStateName}` : selectedDistrictName;
-    document.getElementById('d-route-panel').style.display = 'block';
-    document.getElementById('d-route-panel').scrollIntoView({ behavior:'smooth', block:'nearest' });
+    districtMap.fitBounds(bounds,{padding:[40,40]});
+    document.getElementById('d-route-district-name').textContent=selectedStateName?`${selectedDistrictName}, ${selectedStateName}`:selectedDistrictName;
+    document.getElementById('d-route-panel').style.display='block'; document.getElementById('d-route-panel').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-window.addEventListener('load', () => {
-    loadAccuracyCard();
-});
 
-function loadAccuracyCard() {
-    fetch('/api/model-accuracy')
-        .then(r => r.json())
-        .then(data => {
-            if (!data.success) {
-                document.getElementById('acc-status').textContent = 'Could not load metrics';
-                document.getElementById('acc-status').style.color = 'rgba(220,38,38,0.15)';
-                return;
-            }
-            const m = data.metrics;
-            document.getElementById('acc-accuracy').textContent = m.accuracy.toFixed(2) + '%';
-            document.getElementById('acc-f1').textContent       = m.f1.toFixed(2) + '%';
-            document.getElementById('acc-auc').textContent      = m.auc.toFixed(3);
-            document.getElementById('acc-cv').textContent       = m.cv_mean.toFixed(2) + '%';
-            document.getElementById('acc-dataset').textContent  =
-                m.dataset.total.toLocaleString() + ' samples \u00a0|\u00a0 ' + m.dataset.n_features + ' features';
-            document.getElementById('acc-status').textContent =
-                '\u2713 Trained at ' + m.trained_at;
-            document.getElementById('acc-status').style.color = 'rgba(22,163,74,0.15)';
-        })
-        .catch(() => {
-            document.getElementById('acc-status').textContent = 'Backend offline';
-            document.getElementById('acc-status').style.color = 'rgba(220,38,38,0.15)';
-        });
-}
 </script>
 </body>
 </html>
