@@ -1,0 +1,33 @@
+# ════════════════════════════════════════════════════════
+#   FloodWatch India — Environment Variables
+#   Copy this file to your project root as  .env
+#   NEVER commit this file to GitHub
+# ════════════════════════════════════════════════════════
+
+# ── Flask Secret Key ─────────────────────────────────────
+# Generate a strong one at: python -c "import secrets; print(secrets.token_hex(32))"
+SECRET_KEY= cc8473364c5ae2e98c1770f47c17256dafaf615ec57e6ec149fde76fb2d2809a
+
+# ── Gmail (for sending flood alert emails) ───────────────
+# Use your Gmail address
+GMAIL_ADDRESS=shalinib491@gmail.com
+# Use an App Password (NOT your real Gmail password)
+# How to get App Password:
+#   1. Go to myaccount.google.com
+#   2. Security → 2-Step Verification → App Passwords
+#   3. Generate one for "Mail" and paste it below
+GMAIL_APP_PASSWORD = vsiq iltd vgla wggk
+
+# ── OpenWeatherMap API Key (for live weather data) ───────
+# Get a free key at: https://openweathermap.org/api
+# Sign up → API Keys → Copy your key
+OWM_API_KEY=f517ae38582ef1fbd594a2fa7e483b4d
+
+# ── Database Path ─────────────────────────────────────────
+# Local development — leave as default
+# On Render with persistent disk — set to /data/flood_data.db
+DB_PATH=flood_data.db
+
+# ── Flask Debug Mode ──────────────────────────────────────
+# Set to 1 for local development, 0 for production
+FLASK_DEBUG=0
