@@ -1,0 +1,37 @@
+{
+  "base_model": {
+    "feature_count": 20,
+    "feature_names": [
+      "MonsoonIntensity",
+      "TopographyDrainage",
+      "RiverManagement",
+      "Deforestation",
+      "Urbanization",
+      "ClimateChange",
+      "DamsQuality",
+      "Siltation",
+      "AgriculturalPractices",
+      "Encroachments",
+      "IneffectiveDisasterPreparedness",
+      "DrainageSystems",
+      "CoastalVulnerability",
+      "Landslides",
+      "Watersheds",
+      "DeterioratingInfrastructure",
+      "PopulationScore",
+      "WetlandLoss",
+      "InadequatePlanning",
+      "PoliticalFactors"
+    ],
+    "rows": 50000
+  },
+  "combined_model": {
+    "feature_count": 2,
+    "feature_names": [
+      "rainfall",
+      "water_level"
+    ],
+    "rows": 6000
+  },
+  "generated_from": "scripts/retrain_models.py"
+}
