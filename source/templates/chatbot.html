@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Assistant - FloodGuard India</title>
+    <style>
+        :root {
+            --brand:#0f4c81;
+            --accent:#10b981;
+            --bg:#eef7ff;
+            --panel:#ffffff;
+            --text:#16324f;
+            --muted:#5f7d99;
+            --border:#cde3f5;
+        }
+        * { box-sizing:border-box; }
+        body {
+            margin:0;
+            font-family:Segoe UI, Arial, sans-serif;
+            background:linear-gradient(180deg, #dff1ff 0%, #eef7ff 100%);
+            color:var(--text);
+        }
+        .wrap {
+            max-width:980px;
+            margin:0 auto;
+            padding:24px 16px 40px;
+        }
+        .topbar {
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            margin-bottom:20px;
+        }
+        .topbar a {
+            color:var(--brand);
+            text-decoration:none;
+            font-weight:600;
+        }
+        .hero {
+            background:var(--panel);
+            border:1px solid var(--border);
+            border-radius:18px;
+            padding:24px;
+            box-shadow:0 10px 26px rgba(15,76,129,.08);
+            margin-bottom:18px;
+        }
+        .hero h1 { margin:0 0 10px; font-size:30px; }
+        .hero p { margin:0; color:var(--muted); line-height:1.6; }
+        .example-row {
+            display:flex;
+            flex-wrap:wrap;
+            gap:10px;
+            margin-top:16px;
+        }
+        .chip {
+            border:1px solid var(--border);
+            background:#f6fbff;
+            color:var(--brand);
+            border-radius:999px;
+            padding:10px 14px;
+            cursor:pointer;
+            font-size:14px;
+        }
+        .chat-page-shell {
+            background:var(--panel);
+            border:1px solid var(--border);
+            border-radius:18px;
+            min-height:640px;
+            display:flex;
+            flex-direction:column;
+            overflow:hidden;
+            box-shadow:0 10px 26px rgba(15,76,129,.08);
+        }
+        .chat-head {
+            padding:18px 20px;
+            background:linear-gradient(135deg, #0f4c81, #2563eb);
+            color:white;
+            font-weight:700;
+        }
+        .chat-head span {
+            display:block;
+            font-size:13px;
+            font-weight:500;
+            opacity:.9;
+            margin-top:4px;
+        }
+        .chat-messages {
+            flex:1;
+            padding:18px;
+            overflow:auto;
+            background:#f8fbff;
+        }
+        .chat-input-row {
+            display:flex;
+            gap:10px;
+            padding:16px;
+            border-top:1px solid var(--border);
+            background:#fff;
+        }
+        .chat-input-row input {
+            flex:1;
+            border:1px solid var(--border);
+            border-radius:12px;
+            padding:14px;
+            font-size:15px;
+        }
+        .chat-input-row button {
+            border:none;
+            border-radius:12px;
+            background:linear-gradient(135deg, #0f4c81, #2563eb);
+            color:white;
+            padding:0 18px;
+            font-weight:700;
+            cursor:pointer;
+        }
+        @media (max-width: 640px) {
+            .chat-input-row { flex-direction:column; }
+            .chat-input-row button { padding:14px; }
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="topbar">
+        <a href="/dashboard">Back to Dashboard</a>
+        <a href="/">Home</a>
+    </div>
+
+    <div class="hero">
+        <h1>Weather and Flood Assistant</h1>
+        <p>Ask about weather, flood risk, forecast windows, shelters, safe routes, or rainfall scenarios. This assistant uses your project’s real services instead of generic chatbot replies.</p>
+        <div class="example-row">
+            <button class="chip" onclick="window.sendQuickChatbotMessage('weather in Chennai')">weather in Chennai</button>
+            <button class="chip" onclick="window.sendQuickChatbotMessage('flood risk in Erode')">flood risk in Erode</button>
+            <button class="chip" onclick="window.sendQuickChatbotMessage('24 hour forecast for Coimbatore')">24 hour forecast for Coimbatore</button>
+            <button class="chip" onclick="window.sendQuickChatbotMessage('nearest shelter in Salem')">nearest shelter in Salem</button>
+        </div>
+    </div>
+
+    <div class="chat-page-shell">
+        <div class="chat-head">
+            FloodGuard Assistant
+            <span>Weather, flood risk, shelters, routes, and scenario help</span>
+        </div>
+        <div class="chat-messages" id="chatbot-messages"></div>
+        <div class="chat-input-row">
+            <input id="chatbot-input" type="text" placeholder="Ask something like: explain the flood risk in Chennai" />
+            <button id="chatbot-send" type="button">Send</button>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/chatbot.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prediction Result - FloodGuard India</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root{--brand:#0369a1;--accent:#0891b2;--danger:#dc2626;--warn:#d97706;--safe:#16a34a;--bg:#edf6ff;--glass:rgba(255,255,255,0.88);--border:rgba(14,165,233,0.2);--text:#1e3a5f;--muted:#4a7fa5;}
+        *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:'Exo 2',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+        body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 70% 50% at 10% 20%,rgba(186,230,255,.65) 0%,transparent 55%),radial-gradient(ellipse 60% 50% at 90% 80%,rgba(147,210,255,.55) 0%,transparent 55%),linear-gradient(180deg,#dbeeff 0%,#eaf5ff 40%,#f0f9ff 100%);}
+        .topbar{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:60px;box-shadow:0 2px 16px rgba(14,165,233,.08);}
+        .topbar h1{font-family:'Orbitron',sans-serif;font-size:14px;font-weight:700;color:var(--brand);letter-spacing:.8px;}
+        .topbar nav a{color:var(--muted);text-decoration:none;font-size:13px;font-weight:600;margin-left:12px;padding:6px 14px;border-radius:8px;border:1px solid transparent;transition:all .2s;}
+        .topbar nav a:hover{background:rgba(14,165,233,.09);border-color:var(--border);color:var(--brand);}
+        .page{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:28px 16px 60px;}
+        .result-banner{border-radius:18px;padding:28px 22px;text-align:center;margin-bottom:16px;color:white;animation:fadeUp .5s ease both;}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        .result-banner.high{background:linear-gradient(135deg,#fb7185,#ea580c);}
+        .result-banner.moderate,.result-banner.medium{background:linear-gradient(135deg,#f59e0b,#d97706);}
+        .result-banner.low{background:linear-gradient(135deg,#22c55e,#16a34a);}
+        .result-banner.very-high{background:linear-gradient(135deg,#dc2626,#9f1239);}
+        .banner-icon{font-size:42px;margin-bottom:10px;}
+        .banner-title{font-family:'Orbitron',sans-serif;font-size:18px;font-weight:700;margin-bottom:6px;letter-spacing:.5px;}
+        .banner-sub{font-size:14px;opacity:.92;}
+        .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+        .card{background:var(--glass);border:1px solid var(--border);border-radius:14px;padding:20px 22px;box-shadow:0 2px 14px rgba(14,165,233,.07);}
+        .card h3{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:var(--brand);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px;}
+        .prob-lbl{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;font-family:'Orbitron',sans-serif;}
+        .prob-track{background:rgba(14,165,233,.1);border-radius:8px;height:12px;overflow:hidden;margin-bottom:10px;border:1px solid var(--border);}
+        .prob-fill{height:100%;border-radius:8px;transition:width .9s ease;}
+        .prob-fill.high,.prob-fill.very-high{background:linear-gradient(90deg,#fb7185,var(--danger));}
+        .prob-fill.moderate,.prob-fill.medium{background:linear-gradient(90deg,#fcd34d,var(--warn));}
+        .prob-fill.low{background:linear-gradient(90deg,#4ade80,var(--safe));}
+        .prob-val{font-family:'Orbitron',sans-serif;font-size:2rem;font-weight:900;color:var(--text);}
+        .param-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(14,165,233,.08);font-size:14px;gap:12px;}
+        .param-row:last-child{border-bottom:none;}
+        .param-key{color:var(--muted);font-weight:600;}
+        .param-val{font-weight:700;font-size:15px;font-family:'Orbitron',sans-serif;text-align:right;}
+        .risk-high,.risk-very-high{color:#dc2626;}
+        .risk-moderate,.risk-medium{color:#d97706;}
+        .risk-low{color:#16a34a;}
+        .reason-card{background:rgba(8,145,178,.06);border:1px solid rgba(8,145,178,.15);border-radius:14px;padding:20px 22px;margin-bottom:14px;}
+        .reason-card h3{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;}
+        .reason-card ul{list-style:none;padding:0;}
+        .reason-card li{padding:8px 0;font-size:14px;color:#2c5282;border-bottom:1px solid rgba(8,145,178,.08);display:flex;align-items:flex-start;gap:10px;}
+        .reason-card li:last-child{border-bottom:none;}
+        .reason-card li::before{content:"-";color:var(--accent);font-weight:700;font-size:16px;line-height:1.2;flex-shrink:0;}
+        .reco-card{background:rgba(255,184,0,.06);border:1px solid rgba(217,119,6,.2);border-radius:14px;padding:20px 22px;margin-bottom:16px;border-left:4px solid var(--warn);}
+        .reco-card h3{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:var(--warn);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;}
+        .reco-card ul{list-style:none;padding:0;}
+        .reco-card li{padding:8px 0;font-size:14px;color:#2c5282;border-bottom:1px solid rgba(217,119,6,.08);display:flex;align-items:flex-start;gap:10px;}
+        .reco-card li:last-child{border-bottom:none;}
+        .reco-card li::before{content:">";color:var(--warn);font-weight:700;font-size:16px;line-height:1.2;flex-shrink:0;}
+        .emergency-card{background:rgba(220,38,38,.05);border:1px solid rgba(220,38,38,.15);border-radius:14px;padding:16px 22px;margin-bottom:16px;display:flex;gap:20px;flex-wrap:wrap;align-items:center;}
+        .emergency-title{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;color:var(--danger);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;width:100%;}
+        .em-item{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);}
+        .em-num{font-family:'Orbitron',sans-serif;font-size:15px;font-weight:900;color:var(--danger);}
+        .actions{display:flex;gap:12px;margin-top:4px;}
+        .btn{flex:1;padding:14px;border:none;border-radius:12px;font-family:'Exo 2',sans-serif;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:transform .2s,box-shadow .2s;}
+        .btn-primary{background:linear-gradient(135deg,var(--brand),var(--accent));color:white;box-shadow:0 4px 16px rgba(14,165,233,.25);}
+        .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(14,165,233,.35);}
+        .btn-secondary{background:white;color:var(--brand);border:2px solid var(--brand);}
+        .btn-secondary:hover{background:rgba(14,165,233,.06);transform:translateY(-1px);}
+        footer{text-align:center;font-size:12px;color:#94a3b8;padding:28px 0 0;position:relative;z-index:1;}
+        @media(max-width:700px){.grid{grid-template-columns:1fr;}}
+        @media(max-width:480px){.actions{flex-direction:column;}.emergency-card{flex-direction:column;gap:10px;}.em-item{width:100%;}}
+    </style>
+</head>
+<body>
+<div class="topbar">
+    <h1>&#9928; FloodGuard India</h1>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
+    </nav>
+</div>
+
+<div class="page">
+
+    {% set risk_class = risk_level|lower|replace(' ', '-') %}
+    {% set prob_int = probability|int %}
+    {% set confidence_pct = (confidence * 100)|int %}
+
+    {% if risk_level == "Very High" %}
+    <div class="result-banner very-high">
+        <div class="banner-icon">&#9888;</div>
+        <div class="banner-title">Critical Flood Threat</div>
+        <div class="banner-sub">Very high flood risk detected for this location</div>
+    </div>
+    {% elif risk_level == "High" %}
+    <div class="result-banner high">
+        <div class="banner-icon">&#9888;</div>
+        <div class="banner-title">Flood Warning Issued</div>
+        <div class="banner-sub">High flood risk detected based on your inputs</div>
+    </div>
+    {% elif risk_level == "Moderate" or risk_level == "Medium" %}
+    <div class="result-banner moderate">
+        <div class="banner-icon">&#9889;</div>
+        <div class="banner-title">Moderate Risk Detected</div>
+        <div class="banner-sub">Conditions are concerning - stay alert</div>
+    </div>
+    {% else %}
+    <div class="result-banner low">
+        <div class="banner-icon">&#10003;</div>
+        <div class="banner-title">Conditions Look Safe</div>
+        <div class="banner-sub">Low flood risk at current readings</div>
+    </div>
+    {% endif %}
+
+    <div class="grid">
+        <div class="card">
+            <div class="prob-lbl">Flood Risk Probability</div>
+            <div class="prob-track">
+                <div class="prob-fill {{ risk_class }}" style="width: {{ prob_int }}%;"></div>
+            </div>
+            <div class="prob-val">{{ prob_int }}%</div>
+        </div>
+
+        <div class="card">
+            <div class="prob-lbl">Model Confidence</div>
+            <div class="prob-track">
+                <div class="prob-fill low" style="width: {{ confidence_pct }}%;"></div>
+            </div>
+            <div class="prob-val">{{ confidence_pct }}%</div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px;">
+        <h3>Prediction Details</h3>
+        <div class="param-row">
+            <span class="param-key">Location</span>
+            <span class="param-val">{{ location }}</span>
+        </div>
+        <div class="param-row">
+            <span class="param-key">Rainfall</span>
+            <span class="param-val">{{ rainfall }} mm</span>
+        </div>
+        <div class="param-row">
+            <span class="param-key">Water Level</span>
+            <span class="param-val">{{ water_level }} m</span>
+        </div>
+        <div class="param-row">
+            <span class="param-key">River Flow</span>
+            <span class="param-val">{{ river_flow }} m&#179;/s</span>
+        </div>
+        <div class="param-row">
+            <span class="param-key">Temperature</span>
+            <span class="param-val">{{ temperature }} &#8451;</span>
+        </div>
+        <div class="param-row">
+            <span class="param-key">Humidity</span>
+            <span class="param-val">{{ humidity }}%</span>
+        </div>
+        <div class="param-row">
+            <span class="param-key">Risk Level</span>
+            {% if risk_level == "High" or risk_level == "Very High" %}
+                <span class="param-val risk-high">{{ risk_level }}</span>
+            {% elif risk_level == "Moderate" or risk_level == "Medium" %}
+                <span class="param-val risk-moderate">{{ risk_level }}</span>
+            {% else %}
+                <span class="param-val risk-low">{{ risk_level }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="reason-card">
+        <h3>Why This Risk Was Predicted</h3>
+        <ul>
+            {% for reason in reasons %}
+            <li>{{ reason }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    {% if risk_level == "High" or risk_level == "Very High" or risk_level == "Moderate" or risk_level == "Medium" %}
+    <div class="reco-card">
+        <h3>Recommended Actions</h3>
+        <ul>
+            <li>Monitor weather and river-level updates continuously</li>
+            <li>Alert local authorities and emergency services immediately</li>
+            <li>Evacuate low-lying and flood-prone areas if local conditions worsen</li>
+            <li>Move valuables and important documents to higher ground</li>
+            <li>Keep emergency supplies and evacuation routes ready</li>
+            <li>Stay away from rivers, drains, and water bodies</li>
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if risk_level == "High" or risk_level == "Very High" %}
+    <div class="emergency-card">
+        <div class="emergency-title">&#9889; Emergency Contacts</div>
+        <div class="em-item">Disaster Helpline <span class="em-num">1070</span></div>
+        <div class="em-item">Police <span class="em-num">100</span></div>
+        <div class="em-item">Ambulance <span class="em-num">108</span></div>
+        <div class="em-item">Fire <span class="em-num">101</span></div>
+    </div>
+    {% endif %}
+
+    <div class="actions">
+        <a href="/" class="btn btn-primary">New Prediction</a>
+        <a href="/dashboard" class="btn btn-secondary">View Dashboard</a>
+    </div>
+
+</div>
+
+<footer><p>&copy; 2024 FloodGuard India | Powered by AI</p></footer>
+</body>
+</html>
