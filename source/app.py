@@ -1,19 +1,4 @@
-"""
-app.py  —  Flood Prediction System (Flask)
-Final version with ALL fixes applied:
 
-  Fix 1 — All secrets moved to .env (no hardcoded credentials)
-  Fix 2 — @login_required on all protected pages and sensitive API routes
-  Fix 3 — predict_flood_risk() passes temperature + humidity to combined_predictor
-  Fix 4 — /api/hydrology returns all fields frontend needs (scenarios, severity, etc.)
-  Fix 5 — /api/hydrology/batch route added
-  Fix A — DB_PATH from environment (persistent disk on Render)
-  Fix B — Users persisted in SQLite instead of in-memory dict
-  Fix C — @login_required on /api/location-risk and /api/flood-zones
-  Fix D — 404 / 500 error handlers (no raw tracebacks in production)
-  Fix E — Rate limiting on alert endpoints
-  Fix F — ML model warm-up on startup to avoid slow first request
-"""
 
 import sys
 import os
@@ -23,19 +8,28 @@ import random
 import threading
 import io
 import csv
-import sqlite3
 from datetime import datetime, timedelta
 from collections import deque
 from functools import wraps
+from models.db import init_users_db, get_alert_recipients
+from routes.alerts import alerts_bp, configure_alerts
+from routes.auth import auth_bp
+from routes.chatbot import chatbot_bp, configure_chatbot
+from routes.hydrology import hydrology_bp, configure_hydrology
+from routes.predictions import predictions_bp, configure_predictions
+from services.chatbot_service import WeatherChatbotService
+from services.predictor_service import PredictorService
+from services.shelter_service import ShelterService
+from services.weather_service import fetch_live_weather, fetch_weather_forecast, normalize_city, fetch_reverse_geocode
+
+
 
 # ── Load .env FIRST before anything else ────────────────────────────────────
 from dotenv import load_dotenv
 load_dotenv()
 
-import requests as _req
 from flask import (Flask, render_template, request, jsonify,
                    session, redirect, url_for, Response)
-from werkzeug.security import generate_password_hash as _hash, check_password_hash
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'utils'))
 
@@ -43,6 +37,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'utils'))
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.secret_key = os.getenv('SECRET_KEY', 'change-me-generate-with-secrets-token-hex-32')
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.getenv('APP_ENV', 'development').lower() == 'production'
+app.register_blueprint(auth_bp)
 
 # ── FIX E: Rate limiting ─────────────────────────────────────────────────────
 try:
@@ -68,7 +66,7 @@ def login_required(f):
         if 'user_email' not in session:
             if request.path.startswith('/api/'):
                 return jsonify({'success': False, 'error': 'Authentication required'}), 401
-            return redirect(url_for('login'))
+            return redirect(url_for('auth.login'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -79,11 +77,8 @@ OWM_API_KEY    = os.getenv('OWM_API_KEY')
 
 # ── Load utils ───────────────────────────────────────────────────────────────
 try:
-    from alert_service import AlertService
-    alert_service = AlertService(
-        gmail_address  = GMAIL_ADDRESS,
-        gmail_password = GMAIL_PASSWORD,
-    )
+    from services.alert_service import build_alert_service
+    alert_service = build_alert_service()
     ALERTS_OK = True
     print("[OK] alert_service loaded")
 except Exception as e:
@@ -91,14 +86,22 @@ except Exception as e:
     ALERTS_OK = False
     print(f"[WARN] alert_service: {e}")
 
+
 try:
-    from weather_api import get_live_weather, normalize_city_name, get_weather_forecast
+    from services.weather_service import (
+        fetch_live_weather,
+        fetch_weather_forecast,
+        normalize_city,
+    )
     WEATHER_OK = True
-    print("[OK] weather_api loaded")
+    print("[OK] weather_service loaded")
 except Exception as e:
-    get_live_weather = None
+    fetch_live_weather = None
+    fetch_weather_forecast = None
+    normalize_city = None
     WEATHER_OK = False
-    print(f"[WARN] weather_api: {e}")
+    print(f"[WARN] weather_service: {e}")
+
 
 try:
     from combined_predictor import CombinedFloodPredictor
@@ -111,7 +114,13 @@ except Exception as e:
     print(f"[WARN] combined_predictor: {e}")
 
 # ── FIX A: DB_PATH from environment (persistent disk on Render) ──────────────
-DB_PATH = os.getenv('DB_PATH', 'flood_data.db')  # set to /data/flood_data.db on Render
+DB_PATH = os.getenv('DB_PATH', 'artifacts/data/flood_data.db')
+USERS_DB_PATH = os.getenv('USERS_DB_PATH', 'artifacts/data/users.db')
+MODEL_PATH = os.getenv('MODEL_PATH', 'artifacts/models/flood_prediction_model.pkl')
+SCALER_PATH = os.getenv('SCALER_PATH', 'artifacts/models/scaler.pkl')
+COMBINED_MODEL_PATH = os.getenv('COMBINED_MODEL_PATH', 'artifacts/models/combined_flood_model.pkl')
+COMBINED_SCALER_PATH = os.getenv('COMBINED_SCALER_PATH', 'artifacts/models/combined_scaler.pkl')
+  # set to /data/flood_data.db on Render
 
 try:
     from database import FloodDatabase
@@ -134,78 +143,14 @@ except Exception as e:
 
 # ── Base model fallback ──────────────────────────────────────────────────────
 try:
-    _base_model = pickle.load(open('models/flood_model.pkl', 'rb'))
-    print("[OK] flood_model.pkl loaded")
+    _base_model = pickle.load(open(MODEL_PATH, 'rb'))
+    print(f"[OK] flood model loaded from {MODEL_PATH}")
 except Exception:
     _base_model = None
-    print("[WARN] flood_model.pkl not found — using rule-based fallback")
+    print(f"[WARN] flood model not found at {MODEL_PATH} — using rule-based fallback")
 
-# ════════════════════════════════════════════════════════════════════════════
-# FIX B: SQLite-backed user store (replaces in-memory users_db dict)
-# ════════════════════════════════════════════════════════════════════════════
 
-def _get_users_conn():
-    """Return a connection to the users SQLite file."""
-    users_db_path = DB_PATH.replace('flood_data.db', 'users.db')
-    conn = sqlite3.connect(users_db_path, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-def _init_users_db():
-    conn = _get_users_conn()
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            email          TEXT PRIMARY KEY,
-            name           TEXT NOT NULL,
-            password_hash  TEXT NOT NULL,
-            phone          TEXT DEFAULT "",
-            receive_alerts INTEGER DEFAULT 1
-        )
-    ''')
-    # Seed default accounts if table is empty
-    if conn.execute('SELECT COUNT(*) FROM users').fetchone()[0] == 0:
-        seeds = [
-            ("admin@floodwatch.in",    "Admin",      _hash("admin123"),   "", 1),
-            ("shanjeetha07@gmail.com", "Shanjeetha", _hash("flood@2024"), "", 1),
-            ("user@floodwatch.in",     "Demo User",  _hash("demo1234"),   "", 1),
-            ("guest@floodwatch.in",    "Guest",      _hash("guest123"),   "", 0),
-        ]
-        conn.executemany('INSERT OR IGNORE INTO users VALUES (?,?,?,?,?)', seeds)
-    conn.commit()
-    conn.close()
-
-_init_users_db()  # runs once on startup
-
-def get_user(email: str):
-    """Return user row as dict or None."""
-    conn = _get_users_conn()
-    row = conn.execute('SELECT * FROM users WHERE email=?', (email,)).fetchone()
-    conn.close()
-    return dict(row) if row else None
-
-def create_user(email, name, password, phone="", receive_alerts=True):
-    """Insert a new user. Returns True on success, False if email taken."""
-    conn = _get_users_conn()
-    try:
-        conn.execute(
-            'INSERT INTO users VALUES (?,?,?,?,?)',
-            (email, name, _hash(password), phone, int(receive_alerts))
-        )
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
-    finally:
-        conn.close()
-
-def get_alert_recipients():
-    """Return list of dicts for all users with receive_alerts=1."""
-    conn = _get_users_conn()
-    rows = conn.execute(
-        'SELECT name, email, phone FROM users WHERE receive_alerts=1'
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+init_users_db()  # runs once on startup
 
 # ── In-memory stores ─────────────────────────────────────────────────────────
 sensor_history = deque(maxlen=30)
@@ -439,206 +384,65 @@ def broadcast_alert(location, risk_level, probability, rainfall, water_level):
     threading.Thread(target=_run, daemon=True).start()
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# FIX 3: Core prediction — passes temperature + humidity
-# ════════════════════════════════════════════════════════════════════════════
-
-def predict_flood_risk(rainfall, water_level, flow_rate=150,
-                       location="Unknown", live=False,
-                       temperature=28, humidity=80):
-    try:
-        if COMBINED_OK:
-            res = combined_predictor.predict(
-                location    = location,
-                rainfall    = rainfall,
-                water_level = water_level,
-                temperature = temperature,
-                humidity    = humidity,
-            )
-            ml    = res.get('ml_prediction', {})
-            risk  = res['combined_risk_level']
-            prob  = round(ml.get('probability', 0.5) * 100, 2)
-            hydro = res.get('hydro_prediction', {})
-            out   = {'risk': risk, 'probability': prob,
-                     'model': 'Combined ML+Hydro', 'hydro': hydro}
-
-        elif _base_model:
-            feat = np.array([[rainfall, water_level, flow_rate]])
-            pred = _base_model.predict(feat)[0]
-            proba= _base_model.predict_proba(feat)[0]
-            risk = 'High' if pred == 1 else 'Low'
-            prob = round(float(proba[1]) * 100, 2)
-            out  = {'risk': risk, 'probability': prob, 'model': 'Base ML'}
-
-        else:
-            score = rainfall * 0.4 + water_level * 30 + flow_rate * 0.2
-            if   score > 150: risk, prob = 'High',     round(min(95, score / 2),   2)
-            elif score > 100: risk, prob = 'Moderate', round(min(65, score / 2.5), 2)
-            else:             risk, prob = 'Low',      round(min(40, score / 3),   2)
-            out = {'risk': risk, 'probability': prob, 'model': 'Rule-based'}
-
-        if DB_OK:
-            try:
-                db.log_prediction(
-                    location        = location,
-                    rainfall_mm     = rainfall,
-                    risk_level      = out['risk'],
-                    probability     = out['probability'] / 100,
-                    prediction_type = out['model'],
-                )
-            except Exception:
-                pass
-
-        if live and out['risk'] in ('High', 'Very High'):
-            _auto_alert(location, out['risk'], out['probability'], rainfall, water_level)
-
-        return out
-
-    except Exception as e:
-        print(f"[predict] {e}")
-        return {'risk': 'Unknown', 'probability': 0, 'model': 'Error'}
+# Prediction and weather helper service
+predictor_service = PredictorService(
+    combined_ok=COMBINED_OK,
+    combined_predictor=combined_predictor,
+    base_model=_base_model,
+    db_ok=DB_OK,
+    db=db,
+    broadcast_alert=broadcast_alert,
+    weather_ok=WEATHER_OK,
+    fetch_live_weather=fetch_live_weather,
+    fetch_weather_forecast=fetch_weather_forecast,
+    normalize_city=normalize_city,
+    city_api_map=CITY_API_MAP,
+    owm_api_key=OWM_API_KEY,
+    base_values=BASE_VALUES,
+    alert_log=alert_log,
+    alert_cooldowns=_alert_cd,
+    datetime_provider=datetime,
+    timedelta_provider=timedelta,
+    random_provider=random,
+)
+shelter_service = ShelterService()
+predict_flood_risk = predictor_service.predict_flood_risk
+predict_risk_forecast = predictor_service.predict_risk_forecast
+get_live_weather_data = predictor_service.get_live_weather_data
+get_realtime_rainfall = predictor_service.get_realtime_rainfall
+gen_history = predictor_service.gen_history
+get_model_status = predictor_service.get_model_status
+chatbot_service = WeatherChatbotService(
+    get_live_weather_data=get_live_weather_data,
+    predict_flood_risk=predict_flood_risk,
+    predict_risk_forecast=predict_risk_forecast,
+    shelter_service=shelter_service,
+    india_locations=INDIA_LOCATIONS,
+    get_model_status=get_model_status,
+)
 
 
-def _auto_alert(location, risk, prob, rf, wl):
-    now  = datetime.now()
-    last = _alert_cd.get(location)
-    if last and (now - last).seconds < 1800:
-        return
-    _alert_cd[location] = now
-    alert_log.append({
-        'timestamp':   now,
-        'location':    location,
-        'risk_level':  risk,
-        'probability': round(prob, 1),
-        'rainfall':    rf,
-        'water_level': wl,
-    })
-    if DB_OK:
-        try:
-            db.log_alert(
-                location=location, risk_level=risk,
-                alert_method='Auto-Broadcast', recipient='all_users',
-                status='Sent', message=f'Auto {risk}',
-            )
-        except Exception:
-            pass
-    broadcast_alert(location, risk, prob, rf, wl)
 
-
-# ── Helpers ──────────────────────────────────────────────────────────────────
-
-def get_live_weather_data(location):
-    if not WEATHER_OK:
-        return None
-    try:
-        city = CITY_API_MAP.get(location, normalize_city_name(location))
-        return get_live_weather(city)
-    except Exception:
-        return None
-
-
-def get_realtime_rainfall(lat=13.0827, lon=80.2707):
-    if not OWM_API_KEY:
-        return None
-    try:
-        url = (
-            f"https://api.openweathermap.org/data/2.5/weather"
-            f"?lat={lat}&lon={lon}&appid={OWM_API_KEY}&units=metric"
-        )
-        r = _req.get(url, timeout=5)
-        if r.status_code == 200:
-            return round(r.json().get('rain', {}).get('1h', 0), 2)
-    except Exception:
-        pass
-    return None
-
-
-def gen_history(location, hours=24):
-    base = BASE_VALUES.get(location, {'rainfall': 40, 'water': 7.0})
-    rows = []
-    for i in range(hours):
-        ts   = datetime.now() - timedelta(hours=hours - i)
-        rf   = max(0, base['rainfall'] + random.uniform(-15, 25))
-        wl   = max(0, base['water']    + random.uniform(-1, 2))
-        flow = max(0, 150 + random.uniform(-30, 80))
-        pred = predict_flood_risk(rf, wl, flow, location)
-        rows.append({
-            'timestamp':    ts.strftime('%Y-%m-%d %H:%M'),
-            'location':     location,
-            'rainfall_mm':  round(rf,   1),
-            'water_level_m':round(wl,   2),
-            'flow_rate':    round(flow, 1),
-            'risk_level':   pred['risk'],
-            'probability':  pred['probability'],
-        })
-    return rows
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# AUTH ROUTES
-# ════════════════════════════════════════════════════════════════════════════
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'GET':
-        return render_template('login.html')
-    d     = request.get_json()
-    email = d.get('email', '').strip().lower()
-    pw    = d.get('password', '')
-    user  = get_user(email)
-    if user and check_password_hash(user['password_hash'], pw):
-        session['user_email'] = email
-        session['user_name']  = user['name']
-        return jsonify({'success': True, 'name': user['name'], 'redirect': '/dashboard'})
-    return jsonify({'success': False, 'error': 'Invalid email or password.'}), 401
-
-
-@app.route('/register', methods=['POST'])
-def register():
-    d     = request.get_json()
-    name  = d.get('name',  '').strip()
-    email = d.get('email', '').strip().lower()
-    pw    = d.get('password', '')
-    phone = d.get('phone', '').strip()
-    if not name or not email or not pw:
-        return jsonify({'success': False, 'error': 'All fields required.'}), 400
-    ok = create_user(email, name, pw, phone)
-    if not ok:
-        return jsonify({'success': False, 'error': 'Email already registered.'}), 409
-    return jsonify({'success': True})
-
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('home'))
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# PAGE ROUTES
-# ════════════════════════════════════════════════════════════════════════════
-
-@app.route('/')
-def home():
-    return render_template('index.html')
-
-
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    return render_template('dashboard.html')
-
-
-@app.route('/alerts')
-@login_required
-def alerts_page():
-    return render_template('alerts.html')
-
-
-@app.route('/hydrology')
-@login_required
-def hydrology_page():
-    return render_template('Hydrology.html')
+configure_predictions(
+    INDIA_LOCATIONS=INDIA_LOCATIONS,
+    CITY_API_MAP=CITY_API_MAP,
+    WEATHER_OK=WEATHER_OK,
+    fetch_weather_forecast=fetch_weather_forecast,
+    normalize_city=normalize_city,
+    fetch_reverse_geocode=fetch_reverse_geocode,
+    shelter_service=shelter_service,
+    predict_flood_risk=predict_flood_risk,
+    predict_risk_forecast=predict_risk_forecast,
+    get_model_status=get_model_status,
+    get_live_weather_data=get_live_weather_data,
+    get_realtime_rainfall=get_realtime_rainfall,
+    sensor_history=sensor_history,
+    random=random,
+    datetime=datetime,
+)
+app.register_blueprint(predictions_bp)
+configure_chatbot(chatbot_service=chatbot_service)
+app.register_blueprint(chatbot_bp)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -662,175 +466,9 @@ def server_error(e):
 def unauthorized(e):
     if request.path.startswith('/api/'):
         return jsonify({'error': 'Authentication required'}), 401
-    return redirect(url_for('login'))
+    return redirect(url_for('auth.login'))
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# CORE API ROUTES
-# ════════════════════════════════════════════════════════════════════════════
-
-@app.route('/api/realtime-data')
-@login_required
-def get_realtime_data():
-    lat      = float(request.args.get('lat', 13.0827))
-    lon      = float(request.args.get('lon', 80.2707))
-    location = request.args.get('location', 'Chennai, Tamil Nadu')
-    rf       = get_realtime_rainfall(lat, lon) or round(random.uniform(0, 100), 2)
-    wl       = round(random.uniform(1.5, 4.5), 2)
-    flow     = round(random.uniform(80, 250), 2)
-    pred     = predict_flood_risk(rf, wl, flow, location, live=True)
-    sensor_history.append({
-        'time':        datetime.now().strftime('%H:%M:%S'),
-        'location':    location,
-        'rainfall':    rf,
-        'water_level': wl,
-        'flow':        flow,
-        'risk':        pred['risk'],
-    })
-    return jsonify({
-        'rainfall':    rf,
-        'water_level': wl,
-        'flow_rate':   flow,
-        'prediction':  pred,
-        'location':    location,
-        'timestamp':   datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-    })
-
-
-# FIX C: Added @login_required
-@app.route('/api/location-risk')
-@login_required
-def location_risk():
-    lat  = float(request.args.get('lat', 13.0827))
-    lon  = float(request.args.get('lon', 80.2707))
-    rf   = round(random.uniform(0, 100), 2)
-    wl   = round(random.uniform(1.5, 4.5), 2)
-    flow = round(random.uniform(80, 250), 2)
-    return jsonify({
-        'latitude':  lat,
-        'longitude': lon,
-        'prediction':predict_flood_risk(rf, wl, flow),
-        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-    })
-
-
-@app.route('/api/states')
-def get_states():
-    return jsonify({'states': sorted(INDIA_LOCATIONS.keys())})
-
-
-@app.route('/api/districts/<state>')
-def get_districts(state):
-    if state not in INDIA_LOCATIONS:
-        return jsonify({'districts': []}), 404
-    return jsonify({'districts': sorted(INDIA_LOCATIONS[state].keys())})
-
-
-@app.route('/api/district-prediction', methods=['POST'])
-@login_required
-def district_prediction():
-    try:
-        d        = request.get_json()
-        state    = d.get('state')
-        district = d.get('district')
-        if state not in INDIA_LOCATIONS or district not in INDIA_LOCATIONS[state]:
-            return jsonify({'success': False, 'error': 'Invalid state or district'}), 400
-        coords   = INDIA_LOCATIONS[state][district]
-        lat, lon = coords['lat'], coords['lon']
-        location = f"{district}, {state}"
-        rf       = get_realtime_rainfall(lat, lon) or round(random.uniform(0, 100), 2)
-        wl       = round(random.uniform(1.5, 4.5), 2)
-        flow     = round(random.uniform(80, 250), 2)
-        pred     = predict_flood_risk(rf, wl, flow, location, live=True)
-        return jsonify({
-            'success':     True,
-            'state':       state,
-            'district':    district,
-            'latitude':    lat,
-            'longitude':   lon,
-            'rainfall':    rf,
-            'water_level': wl,
-            'flow_rate':   flow,
-            'prediction':  pred,
-            'timestamp':   datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@app.route('/predict', methods=['GET', 'POST'])
-def predict():
-    if request.method == 'GET':
-        return render_template('index.html')
-    try:
-        # Support both HTML form POST and AJAX JSON POST
-        if request.is_json:
-            data = request.get_json()
-            rf   = float(data.get('rainfall',    0))
-            wl   = float(data.get('water_level', 0))
-            flow = float(data.get('flow_rate',   0))
-        else:
-            rf   = float(request.form.get('rainfall',    0))
-            wl   = float(request.form.get('water_level', 0))
-            flow = float(request.form.get('flow_rate',   0))
-
-        pred = predict_flood_risk(rf, wl, flow)
-
-        # AJAX call — return JSON
-        if request.is_json:
-            return jsonify({
-                'success':     True,
-                'risk_level':  pred['risk'],
-                'probability': pred['probability'],
-                'model':       pred.get('model', ''),
-                'rainfall':    rf,
-                'water_level': wl,
-                'flow_rate':   flow,
-            })
-
-        # Normal form POST — open result.html
-        return render_template(
-            'result.html',
-            prediction  = f"Flood Risk: {pred['risk']}",
-            risk_level  = pred['risk'],
-            probability = pred['probability'],
-            rainfall    = rf,
-            water_level = wl,
-            river_flow  = flow,
-        )
-    except Exception as e:
-        print(f"[predict error] {e}")
-        if request.is_json:
-            return jsonify({'success': False, 'error': str(e)}), 500
-        return render_template(
-            'result.html',
-            prediction='Error', risk_level='Low',
-            probability=0, rainfall=0, water_level=0, river_flow=0,
-        )
-
-
-# ── Weather ──────────────────────────────────────────────────────────────────
-
-@app.route('/api/weather')
-def api_weather():
-    location = request.args.get('location', 'Chennai, Tamil Nadu')
-    w = get_live_weather_data(location)
-    if w:
-        return jsonify({'success': True, **w})
-    return jsonify({'success': False, 'error': 'Weather unavailable'}), 503
-
-
-@app.route('/api/weather-forecast')
-def api_weather_forecast():
-    if not WEATHER_OK:
-        return jsonify({'success': False}), 503
-    location = request.args.get('location', 'Chennai, Tamil Nadu')
-    try:
-        city = CITY_API_MAP.get(location, normalize_city_name(location))
-        fc   = get_weather_forecast(city, days=3)
-        return jsonify({'success': True, 'forecast': fc or []})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # ── Email helper ──────────────────────────────────────────────────────────────
@@ -851,7 +489,7 @@ def send_email_now(to_email, location, risk_level, probability, rainfall, water_
         f"{'IMMEDIATE EVACUATION MAY BE REQUIRED' if risk_level == 'High' else 'Stay alert and monitor updates.'}\n\n"
         f"Emergency Contacts:\n"
         f"  Disaster Helpline : 1070  |  Police : 100  |  Ambulance : 108\n"
-        f"-- FloodWatch India Alert System --"
+                    f"-- FloodGuard India Alert System --"
     )
     if ALERTS_OK:
         ok = alert_service.send_email(to_email=to_email, subject=subject, body=body)
@@ -889,174 +527,36 @@ def _apply_limit(limit_string):
     return decorator
 
 
-@app.route('/api/send-alert', methods=['POST'])
-@login_required
-@_apply_limit("10 per minute")
-def send_alert():
-    d            = request.get_json()
-    location     = d.get('location', '')
-    risk         = d.get('risk_level', 'High')
-    prob         = float(d.get('probability', 0))
-    rf           = float(d.get('rainfall', 0))
-    wl           = float(d.get('water_level', 0))
-    email_to     = d.get('email', '').strip()
-    phone        = d.get('phone', '')
-    do_sms       = d.get('send_sms', False)
-    do_wa        = d.get('send_whatsapp', False)
-    do_broadcast = d.get('broadcast', False)
+configure_alerts(
+    send_email_now=send_email_now,
+    get_alert_recipients=get_alert_recipients,
+    alert_service=alert_service,
+    ALERTS_OK=ALERTS_OK,
+    DB_OK=DB_OK,
+    db=db,
+    alert_log=alert_log,
+    datetime=datetime,
+    broadcast_alert=broadcast_alert,
+)
+app.register_blueprint(alerts_bp)
+configure_hydrology(
+    scs_compute=scs_compute,
+    COMBINED_OK=COMBINED_OK,
+    combined_predictor=combined_predictor,
+    datetime=datetime,
+    gen_history=gen_history,
+    INDIA_LOCATIONS=INDIA_LOCATIONS,
+    predict_flood_risk=predict_flood_risk,
+    predict_risk_forecast=predict_risk_forecast,
+    random=random,
+    BASE_VALUES=BASE_VALUES,
+    get_live_weather_data=get_live_weather_data,
+    shelter_service=shelter_service,
+    DB_OK=DB_OK,
+    db=db,
+)
+app.register_blueprint(hydrology_bp)
 
-    if not location:
-        return jsonify({'success': False, 'error': 'Location is required'}), 400
-
-    alert_log.append({
-        'timestamp':   datetime.now(),
-        'location':    location,
-        'risk_level':  risk,
-        'probability': prob,
-        'rainfall':    rf,
-        'water_level': wl,
-    })
-
-    if do_broadcast:
-        recipients = get_alert_recipients()
-        results    = []
-        errors     = []
-        for user in recipients:
-            ok, err = send_email_now(user['email'], location, risk, prob, rf, wl)
-            results.append({'email': user['email'], 'name': user['name'],
-                            'success': ok, 'error': err})
-            if not ok:
-                errors.append(f"{user['email']}: {err}")
-            if ALERTS_OK and user.get('phone'):
-                try:
-                    alert_service.trigger_flood_alerts(
-                        location=location, risk_level=risk,
-                        probability=prob / 100, rainfall=rf, water_level=wl,
-                        recipient_email=None, send_sms=True, send_whatsapp=True,
-                        to_phone=user['phone'],
-                    )
-                except Exception as e:
-                    errors.append(f"SMS {user['phone']}: {e}")
-        if DB_OK:
-            try:
-                db.log_alert(location=location, risk_level=risk,
-                             alert_method='Broadcast', recipient='all_users',
-                             status='Sent', message=f'Broadcast {risk}')
-            except Exception:
-                pass
-        success_count = sum(1 for r in results if r['success'])
-        return jsonify({
-            'success':   success_count > 0,
-            'broadcast': True,
-            'sent':      success_count,
-            'total':     len(results),
-            'results':   results,
-            'errors':    errors,
-            'message':   f'Sent to {success_count}/{len(results)} users',
-        })
-    else:
-        if not email_to:
-            return jsonify({'success': False, 'error': 'Email address is required'}), 400
-        ok, err = send_email_now(email_to, location, risk, prob, rf, wl)
-        if DB_OK:
-            try:
-                db.log_alert(location=location, risk_level=risk,
-                             alert_method='Manual', recipient=email_to,
-                             email=email_to, status='Sent' if ok else 'Failed',
-                             message=err or f'Manual {risk}')
-            except Exception:
-                pass
-        if not ok:
-            return jsonify({'success': False, 'error': err}), 500
-        if ALERTS_OK and phone and (do_sms or do_wa):
-            try:
-                sms_body = (
-                    f"FLOOD ALERT [{risk}] - {location}\n"
-                    f"Probability: {prob:.1f}% | Rain: {rf}mm\n"
-                    f"Action: {'EVACUATE NOW' if risk == 'High' else 'Stay alert'} | Helpline: 1070"
-                )
-                if do_sms: alert_service.send_sms(to_number=phone, body=sms_body)
-                if do_wa:  alert_service.send_whatsapp(to_number=phone, body=sms_body)
-            except Exception as e:
-                print(f"[SMS ERROR] {e}")
-        return jsonify({'success': True, 'message': f'Alert email sent to {email_to}'})
-
-
-@app.route('/api/broadcast-alert', methods=['POST'])
-@login_required
-@_apply_limit("5 per minute")
-def broadcast_alert_api():
-    d        = request.get_json()
-    location = d.get('location', '')
-    risk     = d.get('risk_level', 'High')
-    prob     = float(d.get('probability', 80))
-    rf       = float(d.get('rainfall', 0))
-    wl       = float(d.get('water_level', 0))
-    if not location:
-        return jsonify({'success': False, 'error': 'location is required'}), 400
-    alert_log.append({
-        'timestamp': datetime.now(), 'location': location,
-        'risk_level': risk, 'probability': prob,
-        'rainfall': rf, 'water_level': wl,
-    })
-    broadcast_alert(location, risk, prob, rf, wl)
-    recipients = get_alert_recipients()
-    return jsonify({
-        'success':    True,
-        'recipients': len(recipients),
-        'users':      [{'name': u['name'], 'email': u['email'],
-                        'has_phone': bool(u['phone'])} for u in recipients],
-        'message':    f'Broadcast sent to {len(recipients)} registered users',
-    })
-
-
-@app.route('/api/alert-recipients')
-@login_required
-def api_alert_recipients():
-    recipients = get_alert_recipients()
-    return jsonify({
-        'total': len(recipients),
-        'users': [{'name': u['name'], 'email': u['email'],
-                   'has_phone': bool(u['phone'])} for u in recipients],
-    })
-
-
-@app.route('/api/alert-history')
-@login_required
-def api_alert_history():
-    if DB_OK:
-        try:
-            df = db.get_alerts(limit=20)
-            return jsonify(df.to_dict(orient='records'))
-        except Exception:
-            pass
-    alerts = list(alert_log)[-20:]
-    return jsonify([{
-        'time':        a['timestamp'].strftime('%H:%M:%S'),
-        'location':    a['location'],
-        'risk_level':  a['risk_level'],
-        'probability': a['probability'],
-        'rainfall':    a['rainfall'],
-        'water_level': a['water_level'],
-    } for a in reversed(alerts)])
-
-
-@app.route('/api/alert-summary')
-@login_required
-def api_alert_summary():
-    if DB_OK:
-        try:
-            return jsonify(db.get_alert_stats())
-        except Exception:
-            pass
-    alerts = list(alert_log)
-    high   = sum(1 for a in alerts if a['risk_level'] in ('High', 'Very High'))
-    return jsonify({
-        'total_alerts': len(alerts),
-        'high':         high,
-        'sent_count':   len(alerts),
-        'locations':    list({a['location'] for a in alerts}),
-    })
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1145,242 +645,6 @@ def api_geocode():
         return jsonify(location_tracker.forward_geocode(request.args.get('address', '')))
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@app.route('/api/reverse-geocode')
-def api_reverse_geocode():
-    if not LOCATION_OK:
-        return jsonify({'success': False}), 503
-    try:
-        r = location_tracker.reverse_geocode(
-            float(request.args.get('lat')),
-            float(request.args.get('lon')),
-        )
-        return jsonify(r or {'success': False})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# FIX 4: HYDROLOGY ROUTE — returns all fields the frontend needs
-# ════════════════════════════════════════════════════════════════════════════
-
-@app.route('/api/hydrology')
-@login_required
-def api_hydrology():
-    location = request.args.get('location', 'Chennai, Tamil Nadu')
-    rf       = float(request.args.get('rainfall', 50))
-    wl       = float(request.args.get('water_level', 3.0))
-    cn       = float(request.args.get('curve_number', 75))
-    amc      = request.args.get('amc', 'II')
-
-    # ML prediction
-    ml_prob  = 0.0
-    ml_risk  = 'Unknown'
-    combined = 'Low'
-
-    if COMBINED_OK:
-        try:
-            res      = combined_predictor.predict(location, rf, wl)
-            ml_pred  = res.get('ml_prediction', {})
-            ml_prob  = round(ml_pred.get('probability', 0) * 100, 1)
-            ml_risk  = ml_pred.get('risk_level', 'Unknown')
-            combined = res.get('combined_risk_level', 'Low')
-        except Exception as e:
-            print(f"[hydrology] combined_predictor error: {e}")
-    else:
-        # Rule-based fallback
-        score    = rf * 0.4 + wl * 30
-        ml_prob  = round(min(95, score / 2), 1)
-        ml_risk  = 'High' if ml_prob >= 60 else 'Moderate' if ml_prob >= 40 else 'Low'
-        combined = ml_risk
-
-    # SCS hydrology calculation
-    scs = scs_compute(rf, cn, amc)
-
-    # Generate scenarios for the chart (rainfall 10–300 mm)
-    scenarios = []
-    for test_rf in [10, 25, 50, 75, 100, 125, 150, 175, 200, 250, 300]:
-        s = scs_compute(test_rf, cn, amc)
-        scenarios.append({
-            'rainfall_mm':      test_rf,
-            'runoff_mm':        s['runoff_mm'],
-            'flooded_area_pct': s['flooded_area_pct'],
-            'max_depth_m':      s['max_depth_m'],
-        })
-
-    return jsonify({
-        'location':           location,
-        'rainfall':           rf,
-        'water_level':        wl,
-        'curve_number':       cn,
-        'amc':                amc,
-        'combined_risk':      combined,
-        'ml_probability':     ml_prob,
-        'ml_risk':            ml_risk,
-        'flooded_area_pct':   scs['flooded_area_pct'],
-        'max_depth_m':        scs['max_depth_m'],
-        'avg_depth_m':        scs['avg_depth_m'],
-        'runoff_mm':          scs['runoff_mm'],
-        'infiltration_mm':    scs['infiltration_mm'],
-        'runoff_coefficient': scs['runoff_coefficient'],
-        'water_level_rise_m': scs['water_level_rise_m'],
-        'severity_level':     scs['severity_level'],
-        'severity_label':     scs['severity_label'],
-        'scenarios':          scenarios,
-        'timestamp':          datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-    })
-
-
-# ════════════════════════════════════════════════════════════════════════════
-# FIX 5: HYDROLOGY BATCH ROUTE
-# ════════════════════════════════════════════════════════════════════════════
-
-@app.route('/api/hydrology/batch', methods=['POST'])
-@login_required
-def api_hydrology_batch():
-    try:
-        d         = request.get_json()
-        location  = d.get('location', 'Chennai, Tamil Nadu')
-        cn        = float(d.get('curve_number', 75))
-        amc       = d.get('amc', 'II')
-        rainfalls = d.get('rainfalls', [10, 25, 50, 75, 100, 125, 150, 175, 200, 250, 300])
-
-        results = []
-        for rf in rainfalls:
-            scs = scs_compute(rf, cn, amc)
-            sev_map = {
-                'No Flood':          'None',
-                'Minor Flood':       'Low',
-                'Moderate Flood':    'Moderate',
-                'Significant Flood': 'Significant',
-                'Extreme Flood':     'Extreme',
-            }
-            results.append({
-                'rainfall_mm':     rf,
-                'runoff_mm':       scs['runoff_mm'],
-                'infiltration_mm': scs['infiltration_mm'],
-                'runoff_coeff':    scs['runoff_coefficient'],
-                'water_level_rise':scs['water_level_rise_m'],
-                'flooded_area_pct':scs['flooded_area_pct'],
-                'max_depth_m':     scs['max_depth_m'],
-                'severity':        sev_map.get(scs['severity_label'], 'None'),
-            })
-
-        return jsonify({'success': True, 'results': results, 'location': location})
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-# ── Dashboard data ────────────────────────────────────────────────────────────
-
-@app.route('/api/chart-data')
-@login_required
-def chart_data():
-    loc  = request.args.get('location', 'Chennai, Tamil Nadu')
-    rows = gen_history(loc, 24)
-    step = rows[::3]
-    return jsonify({
-        'labels':      [r['timestamp'][-8:] for r in step],
-        'rainfall':    [r['rainfall_mm']    for r in step],
-        'water_level': [r['water_level_m']  for r in step],
-        'risk':        [r['risk_level']     for r in step],
-    })
-
-
-# FIX C: Added @login_required
-@app.route('/api/flood-zones')
-@login_required
-def flood_zones():
-    zones = []
-    for state, districts in INDIA_LOCATIONS.items():
-        for district, coords in districts.items():
-            rf   = round(random.uniform(0, 120), 1)
-            wl   = round(random.uniform(1.5, 5.0), 2)
-            flow = round(random.uniform(80, 280), 1)
-            pred = predict_flood_risk(rf, wl, flow, f"{district}, {state}")
-            zones.append({
-                'district':    district,
-                'state':       state,
-                'lat':         coords['lat'],
-                'lon':         coords['lon'],
-                'risk':        pred['risk'],
-                'probability': pred['probability'],
-                'rainfall':    rf,
-                'water_level': wl,
-            })
-    return jsonify(zones)
-
-
-@app.route('/api/location-metrics')
-@login_required
-def location_metrics():
-    location = request.args.get('location', 'Chennai, Tamil Nadu')
-    base     = BASE_VALUES.get(location, {'rainfall': 40, 'water': 7.0})
-    weather  = get_live_weather_data(location)
-
-    if weather:
-        rf   = weather.get('rainfall', round(base['rainfall'] + random.uniform(-10, 20), 1))
-        temp = weather['temperature']
-        hum  = weather['humidity']
-        wind = weather['wind_speed']
-    else:
-        rf   = round(base['rainfall'] + random.uniform(-10, 20), 1)
-        temp = round(26 + random.uniform(-4, 6), 1)
-        hum  = round(75 + random.uniform(0, 20), 0)
-        wind = round(15 + random.uniform(0, 15), 0)
-
-    wl   = round(base['water'] + random.uniform(-0.5, 1.5), 2)
-    soil = round(65 + random.uniform(0, 25), 0)
-    flow = round(150 + random.uniform(-30, 80), 1)
-
-    pred = predict_flood_risk(rf, wl, flow, location, live=True,
-                              temperature=temp, humidity=hum)
-    return jsonify({
-        'location':      location,
-        'rainfall':      rf,
-        'water_level':   wl,
-        'humidity':      hum,
-        'temperature':   temp,
-        'wind_speed':    wind,
-        'soil_moisture': soil,
-        'flow_rate':     flow,
-        'risk_level':    pred['risk'],
-        'probability':   pred['probability'],
-        'model':         pred.get('model', ''),
-        'timestamp':     datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-    })
-
-
-@app.route('/api/statistics')
-@login_required
-def api_statistics():
-    if DB_OK:
-        try:
-            stats = db.get_stats()
-            return jsonify({
-                'high_risk_events': stats['high_risk'] + stats['very_high_risk'],
-                'avg_rainfall':     0,
-                'max_water_level':  0,
-                'total_records':    stats['total'],
-                'locations':        len(BASE_VALUES),
-            })
-        except Exception:
-            pass
-    all_rows = []
-    for loc in list(BASE_VALUES.keys())[:2]:
-        all_rows.extend(gen_history(loc, 6))
-    high   = sum(1 for r in all_rows if r['risk_level'] == 'High')
-    avg_rf = round(sum(r['rainfall_mm'] for r in all_rows) / max(len(all_rows), 1), 1)
-    max_wl = round(max((r['water_level_m'] for r in all_rows), default=0), 1)
-    return jsonify({
-        'high_risk_events': high,
-        'avg_rainfall':     avg_rf,
-        'max_water_level':  max_wl,
-        'total_records':    len(all_rows),
-        'locations':        len(BASE_VALUES),
-    })
 
 
 @app.route('/api/dataset-sample')
@@ -1499,7 +763,7 @@ def model_accuracy_page():
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Model Accuracy — FloodWatch</title>
+<title>Model Accuracy — FloodGuard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1561,7 +825,7 @@ def model_accuracy_page():
 </head>
 <body>
 <header>
-  <h1>FloodWatch India — Model Accuracy</h1>
+  <h1>FloodGuard India — Model Accuracy</h1>
   <a href="/dashboard">&larr; Back to Dashboard</a>
 </header>
 <div class="container">
@@ -1742,6 +1006,9 @@ if __name__ == '__main__':
     print(f"  Database           : {'ON — ' + DB_PATH if DB_OK else 'OFF'}")
     print(f"  Location Tracker   : {'ON' if LOCATION_OK  else 'OFF'}")
     print(f"  Rate Limiter       : {'ON' if LIMITER_OK   else 'OFF (flask-limiter not installed)'}")
+    print(f"  Model Mode         : {get_model_status()['active_mode']}")
+    if get_model_status().get('compatibility_note'):
+        print(f"  Model Note         : {get_model_status()['compatibility_note']}")
     print(f"  Alert Recipients   : {len(get_alert_recipients())} registered users")
     print(f"  Gmail Address      : {GMAIL_ADDRESS or 'NOT SET — check .env'}")
     print(f"  OWM API Key        : {'SET' if OWM_API_KEY else 'NOT SET — check .env'}")
