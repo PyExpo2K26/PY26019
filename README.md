@@ -1,7 +1,10 @@
-Abstract
-A Python and Machine Learning-based system that predicts flood risks using historical rainfall and river water-level data. When predicted risk exceeds a safe threshold, alerts are generated and safe evacuation routes are suggested via map integration.
+                                                           FLOOD PREDICTION AND ALERT SYSTEM
 
-Objectives
+
+Abstract:
+A Python and Machine Learning-based system that predicts flood risks using historical rainfall and river water-level data. When predicted risk exceeds a safe threshold, alerts are generated and safe evacuation routes are suggested via map integration.And now we included the chatbox in which if we ask any question related to this flood , it gives the answer related to this.
+
+Objectives:
 
 Analyze historical rainfall and river-level data
 Predict flood probability using ML models
@@ -10,10 +13,18 @@ Suggest safe evacuation routes using maps
 Reduce loss of life and property during floods
 
 
-Software Requirements
-ToolPurposePython 3.xCore languageStreamlitWeb UINumPy / PandasData processingScikit-learnML modelsMatplotlibVisualizationFoliumMap integration
+Software Requirements:
+ToolPurpose:  
+Python 3.x      Core language
+Flask           Backend framework
+Streamlit       Web UI
+NumPy/Pandas    Data processing
+Scikit-learn    ML models
+Matplotlib      Visualization
+Folium          Map integration
+MySQL           Database
 
-Hardware Requirements
+Hardware Requirements:
 
 Processor: Intel i3 or above
 RAM: Minimum 4 GB
@@ -21,7 +32,7 @@ Storage: 10 GB free space
 OS: Windows / Linux
 
 
-Methodology
+Methodology:
 
 Collect historical rainfall and river-level data
 Preprocess data (cleaning, normalization)
@@ -31,34 +42,27 @@ Generate alert when risk exceeds threshold
 Visualize safe routes using map integration
 
 
-Modules
+Modules:
 
 Data Collection — Gathers historical datasets
 Preprocessing — Cleans and normalizes data
 Hydrology Module — Computes runoff using SCS-CN method
 Hydraulic Module — Estimates flow using Manning's equation
-Prediction Module — Predicts flood probability via ML
+Prediction Module — Predicts flood probability via Logistic Regression
 Alert Module — Triggers warning when risk exceeds threshold
 Map Module — Displays safe routes and affected areas
 
 
-Model Training
-1. Hydrological Model
-Hydrology models the movement of water through the watershed — from rainfall to runoff. It estimates how much rainfall becomes surface runoff based on soil type, land use, and moisture conditions.
-Method: SCS-CN (Soil Conservation Service Curve Number)
-The potential maximum retention is calculated as:
-S = (25400 / CN) - 254
-The initial abstraction (water lost before runoff begins) is:
+Model Training:
+1. Hydrological Model — SCS-CN Method
+Hydrology models the movement of water through the watershed from rainfall to runoff. It estimates how much rainfall becomes surface runoff based on soil type, land use, and moisture conditions.
+Maximum Soil Retention
+S = (25400 / CN) — 254
+Initial Abstraction
 Ia = 0.2 × S
-The actual surface runoff is then estimated as:
-Q = (P - Ia)² / (P - Ia + S)
-Where:
-
-P = Rainfall (mm)
-CN = Curve Number (based on soil and land use, ranges 0–100)
-S = Potential maximum retention (mm)
-Ia = Initial abstraction (mm)
-Q = Surface runoff (mm)
+Surface Runoff Depth
+Q = (P — Ia)² / (P — Ia + S)
+SymbolMeaningPRainfall (mm)CNCurve Number (0 to 100)SPotential maximum retention (mm)IaInitial abstraction (mm)QSurface runoff depth (mm)
 
 Key Features Extracted:
 
@@ -69,49 +73,122 @@ Terrain slope (%)
 Time of concentration and peak discharge
 
 
-2. Hydraulic Model
-Hydraulics models how water flows through river channels and floodplains — including flow velocity, water depth, and total discharge.
-Method: Manning's Equation
-Flow velocity is calculated as:
-V = (1/n) × R^(2/3) × S^(1/2)
-Total discharge through the channel cross-section is:
+2. Hydraulic Model — Manning's Equation
+Hydraulics models how water flows through river channels and floodplains including flow velocity, water depth, and total discharge.
+Hydraulic Radius
+R = A / P
+Flow Velocity
+V = (1 / n) × R^(2/3) × S^(1/2)
+River Discharge
 Q = A × V
-Where:
-
-V = Flow velocity (m/s)
-n = Manning's roughness coefficient (depends on channel material)
-R = Hydraulic radius (m) = Cross-sectional area / Wetted perimeter
-S = Channel bed slope (m/m)
-Q = Discharge (m³/s)
-A = Cross-sectional area of flow (m²)
-
+Froude Number
+Fr = V / √(g × D)
+SymbolMeaning:
+V               Flow velocity (m/s)
+n               Manning's roughness coefficient
+R               Hydraulic radius (m)
+S               Channel bed slope (m/m)
+Q               Discharge (m³/s)
+A               Cross-sectional area (m²)
+Fr              Froude Number (dimensionless)
 Key Outputs:
 
-Stage-discharge relationship (water level mapped to flow rate)
-Flood inundation extent based on discharge values
-Flow velocity and depth across the floodplain
+Stage-discharge relationship
+Flood inundation extent
+Flow velocity and depth across floodplain
 
 
-3. Integrated ML Pipeline
-The outputs from both the hydrological and hydraulic models are combined with raw field observations to form the complete feature set for machine learning.
+3. Machine Learning Model — Logistic Regression
+Logistic Regression is used for binary flood classification — flood (1) or no flood (0). It outputs a flood probability between 0 and 1.
+Linear Combination
+z = b0 + b1x1 + b2x2 + b3x3 + ... + bnxn
+Sigmoid Function — Flood Probability
+P = 1 / (1 + e^(-z))
+Alert Decision
+If P ≥ 0.70 → Flood Alert Triggered
+If P < 0.70 → No Alert
+Log Loss — Cost Function
+L = —(1/n) × Σ [ y × log(P) + (1—y) × log(1—P) ]
+Gradient Descent — Weight Update
+bj = bj — α × (∂L / ∂bj)
 Feature Set Used for Training:
-FeatureSourceRainfall (mm)Field observationRunoff depth (mm)SCS-CN outputRiver water level (m)Field observationDischarge (m³/s)Manning's equation outputSoil moistureField observationCatchment area (km²)Watershed analysisSlope (%)Terrain data
-Algorithm: Random Forest Classifier
+FeatureSource:
+Rainfall (mm)           Field observation
+Runoff depth(mm)        SCS-CN output
+River water level(m)    Field observation
+Discharge (m³/s)        Manning's output
+Velocity (m/s)          Manning's output
+Soil moisture           Field observation
+Catchment area (km²)    Watershed data
+Slope (%)               Terrain data
 
-Trained on historical flood and non-flood events
-Outputs flood probability between 0 and 1
-Alert is triggered when probability exceeds 0.70
+5. Model Evaluation
+Accuracy = (TP + TN) / (TP + TN + FP + FN)
+Precision = TP / (TP + FP)
+Recall = TP / (TP + FN)
+F1 Score = 2 × (Precision × Recall) / (Precision + Recall)
+Recall is the most critical metric because missing a real flood is more dangerous than a false alarm.
+
+Table Relationships:
+
+Weather Station → Rainfall Data (station_id)
+Weather Station → River Level Data (station_id)
+Weather Station → Flood Prediction (station_id)
+Weather Station → Alert (station_id)
+Weather Station → Safe Route (station_id)
+Watershed → Flood Prediction (watershed_id)
+Flood Prediction → Alert (prediction_id)
+
+Chatbot Module
+Overview:
+An AI-powered chatbot is integrated into the Flood Prediction and Alert System to help users interact with the system using simple natural language. Instead of reading complex prediction reports, users can simply type a question and get an instant clear answer.
 
 
-Model Summary
-ComponentMethodOutputHydrologySCS-CNRunoff depth (mm)HydraulicsManning's EquationDischarge and velocityPredictionRandom ForestFlood probability (0–1)AlertThreshold 0.70Warning triggered
+How It Works:
+
+User types a flood-related question in the chat window
+Chatbot receives the query and fetches relevant data from MySQL database
+AI model processes the query and generates a human-readable response
+Response is displayed instantly in the Streamlit chat interface
+
+
+Key Features
+
+Answers flood risk queries in real time
+Explains prediction results in simple language
+Guides users during flood emergencies
+Suggests safe evacuation routes on request
+Fetches live data from rainfall, river level, and prediction tables
+Available 24/7 without any human operator
+
+Technology
+
+AI language model connected via API
+Integrated with MySQL for live data fetching
+Embedded as interactive chat window in Streamlit UI
+
+
+System Architecture:
+Layer 1 — Data Collection
+Rainfall, river level, and soil data collected and stored in MySQL
+Layer 2 — Hydrological Model
+SCS-CN computes surface runoff depth from rainfall and CN value
+Layer 3 — Hydraulic Model
+Manning's equation computes river discharge and flow velocity from runoff
+Layer 4 — ML Prediction
+Logistic Regression predicts flood probability from all combined features
+Layer 5 — Alert and Routing
+Alert generated if probability exceeds 0.70 and safe evacuation routes displayed on Folium map
 
 Advantages
 
 Physics-informed predictions combining hydrology, hydraulics, and ML
+Four-level risk classification for graduated emergency response
 Early flood warning with configurable thresholds
-User-friendly Streamlit interface
-Visual safe-route suggestions via Folium maps
+Complete end-to-end system from raw data to evacuation routing
+User-friendly interface accessible to non-technical users
+Zero licensing cost — fully open source
+Self-improving system that learns from historical flood events
 
 
 Applications
@@ -132,5 +209,4 @@ Integration with HEC-RAS for advanced hydraulic simulation
 
 
 Conclusion
-The Flood Prediction and Alert System combines hydrological modeling using SCS-CN, hydraulic analysis using Manning's equation, and machine learning using Random Forest to deliver accurate and physics-grounded flood predictions. Timely alerts and map-based evacuation routes help minimize flood-related damage and improve disaster preparedness.
-https://drive.google.com/file/d/1CL89nzGARlpyn5_FjgGke7z18KbGJv6Z/view?usp=sharing - demo video
+The Flood Prediction and Alert System combines hydrological modeling using SCS-CN, hydraulic analysis using Manning's equation, and machine learning using Logistic Regression to deliver accurate and physics-grounded flood predictions. Timely alerts and map-based evacuation routes help minimize flood-related damage and improve disaster preparedness.
