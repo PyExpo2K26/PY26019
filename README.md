@@ -133,3 +133,4 @@ Integration with HEC-RAS for advanced hydraulic simulation
 
 Conclusion
 The Flood Prediction and Alert System combines hydrological modeling using SCS-CN, hydraulic analysis using Manning's equation, and machine learning using Random Forest to deliver accurate and physics-grounded flood predictions. Timely alerts and map-based evacuation routes help minimize flood-related damage and improve disaster preparedness.
+https://drive.google.com/file/d/1CL89nzGARlpyn5_FjgGke7z18KbGJv6Z/view?usp=sharing - demo video
