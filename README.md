@@ -1,4 +1,4 @@
-                                                           FLOOD PREDICTION AND ALERT SYSTEM
+                                                FLOOD PREDICTION AND ALERT SYSTEM
 
 
 Abstract:
